@@ -1,0 +1,16 @@
+{
+  "schema": "sda-db-client-releases-1",
+  "default": {
+    "repo_id": "Biogod/SpatialDataAgent-DB",
+    "revision": "8f116b867ce4097957d4209db712d37bae3c9369",
+    "sample_contract": "sda-release-sample-1",
+    "catalog_path": "catalog/samples.csv",
+    "catalog_sha256": "58085c78174d541d878147912c97ef8d41eaaf87043bbf0c69c2925bbb5ea2cc",
+    "sample_count": 12163,
+    "reference_parquet": {
+      "path": "catalog/samples.parquet",
+      "sha256": "db7c97b2ca7c732ea8d40ab3a2194c1d2c877e860e69463019eeda05b1ffec0c"
+    },
+    "selection_policy": "Explicit fixed published commit; main is resolved only when requested. This record does not assert that the pinned commit is the newest release."
+  }
+}

@@ -1,0 +1,447 @@
+{
+ "index_columns": {
+  "gsm": "GEO sample (canonical GSM of its content group)",
+  "gse": "all GEO series listing the GSM, joined with '+'; the split is computed on this string",
+  "published_gse": "series folder of the sample: samples/<published_gse>/<gsm>",
+  "source_pipeline": "sda-all (agent standardization, independent scorer) or hesrt (H&E Visium/ST, human review)",
+  "source_release": "SDA-All scorer version of the batch, sda-all-gap-20261009, or hesrt-v1.3",
+  "platform": "harmonized platform",
+  "technology": "technology as written by the authors",
+  "organism": "as written in GEO",
+  "tissue": "as written in GEO",
+  "observation_unit": "spot / bin / cell / bead",
+  "n_obs": "observations",
+  "n_vars": "features",
+  "expression_state": "counts (integer X) / non-integer / unknown (SDA-All: as declared and scored)",
+  "verification": "VERIFIED / ATTESTED (SDA-All scorer) or human_visual_review (HESRT)",
+  "expression_sha256": "SHA256 of the sample's spatial.h5ad",
+  "coordinate_units": "units of obsm['spatial']: um / pixel / native_grid / unstated",
+  "um_basis": "verified / declared_unverified / platform_constant / unresolved",
+  "um_per_unit": "micrometres per coordinate unit when known",
+  "has_spatial_um": "obsm['spatial_um'] present (micrometre copy of non-um coordinates)",
+  "has_image": "image.tif present",
+  "image_stain": "stain of image.tif ('(heuristic)' = pixel-only call)",
+  "image_stain_basis": "basis of the stain label",
+  "image_um_per_px": "micrometres per image.tif pixel when known",
+  "image_registration": "VERIFIED / PARTIAL / UNRESOLVED / FAILED / ABSENT (modality acceptance), WITHHELD (HESRT review FAIL: no image delivered), HESRT_HUMAN_REVIEW, empty = no registrable image",
+  "image_sha256": "SHA256 of image.tif",
+  "segmentation": "cell / nucleus boundary acceptance (sources in sample.json)",
+  "molecules": "molecule table acceptance (sources in sample.json)",
+  "molecules_use": "positions_only: molecules without usable cell IDs",
+  "flags": "units_unstated / attested / summary_features_in_matrix / hesrt_review_fail / hesrt_fail_image_released / image_partial_coverage / image_review_fail",
+  "qc_flags": "deposit QC flags (annotation only)",
+  "drop_features": "features to drop before use",
+  "review_decision": "latest author review of this expression file: PASS / FAIL / UNSURE",
+  "review_category": "review category",
+  "review_notes": "review notes",
+  "content_group": "independence unit",
+  "group_kind": "cross_gse_redeposit / library_alias",
+  "aliases": "GSMs with identical content not listed as rows",
+  "split": "train / val / test by series",
+  "sample_dir": "samples/<published_gse>/<gsm>"
+ },
+ "sample_json": {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sda-release-sample-1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+   "schema",
+   "release_id",
+   "gsm",
+   "gse",
+   "published_gse",
+   "metadata",
+   "expression",
+   "coordinates",
+   "image",
+   "segmentation",
+   "molecules",
+   "quality",
+   "dedup",
+   "split",
+   "provenance"
+  ],
+  "properties": {
+   "schema": {
+    "const": "sda-release-sample-1"
+   },
+   "release_id": {
+    "type": "string"
+   },
+   "gsm": {
+    "type": "string",
+    "pattern": "^GSM[0-9]+$"
+   },
+   "gse": {
+    "type": "array",
+    "items": {
+     "type": "string",
+     "pattern": "^GSE[0-9]+$"
+    },
+    "minItems": 1
+   },
+   "published_gse": {
+    "type": "string",
+    "pattern": "^GSE[0-9]+$"
+   },
+   "metadata": {
+    "type": "object",
+    "required": [
+     "organism",
+     "tissue",
+     "platform",
+     "technology"
+    ],
+    "properties": {
+     "organism": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "tissue": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "platform": {
+      "type": "string"
+     },
+     "technology": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "fields": {
+      "type": "object"
+     },
+     "field_sources": {
+      "type": "object"
+     }
+    }
+   },
+   "expression": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "file",
+     "sha256",
+     "n_obs",
+     "n_vars",
+     "state",
+     "observation_unit",
+     "verification"
+    ],
+    "properties": {
+     "file": {
+      "const": "spatial.h5ad"
+     },
+     "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+     },
+     "n_obs": {
+      "type": "integer",
+      "minimum": 1
+     },
+     "n_vars": {
+      "type": "integer",
+      "minimum": 1
+     },
+     "state": {
+      "type": "string"
+     },
+     "observation_unit": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "verification": {
+      "type": "string"
+     }
+    }
+   },
+   "coordinates": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "obsm_key",
+     "units",
+     "um_basis",
+     "spatial_um"
+    ],
+    "properties": {
+     "obsm_key": {
+      "const": "spatial"
+     },
+     "units": {
+      "enum": [
+       "mm",
+       "native_grid",
+       "nm",
+       "pixel",
+       "um",
+       "unstated"
+      ]
+     },
+     "um_basis": {
+      "enum": [
+       "declared_unverified",
+       "platform_constant",
+       "unresolved",
+       "verified"
+      ]
+     },
+     "um_per_unit": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "um_basis_detail": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "spatial_um": {
+      "type": "boolean"
+     }
+    }
+   },
+   "image": {
+    "oneOf": [
+     {
+      "type": "null"
+     },
+     {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "file",
+       "sha256",
+       "shape",
+       "dtype",
+       "channels",
+       "stain",
+       "um_per_px",
+       "spatial_to_pixel",
+       "registration",
+       "inside_fraction",
+       "source"
+      ],
+      "properties": {
+       "file": {
+        "const": "image.tif"
+       },
+       "sha256": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+       },
+       "shape": {
+        "type": "array",
+        "items": {
+         "type": "integer"
+        },
+        "minItems": 2,
+        "maxItems": 2
+       },
+       "dtype": {
+        "enum": [
+         "uint8",
+         "uint16"
+        ]
+       },
+       "channels": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        },
+        "minItems": 1
+       },
+       "stain": {
+        "type": [
+         "string",
+         "null"
+        ]
+       },
+       "stain_basis": {
+        "type": [
+         "string",
+         "null"
+        ]
+       },
+       "um_per_px": {
+        "type": [
+         "number",
+         "null"
+        ]
+       },
+       "spatial_to_pixel": {
+        "type": "array",
+        "minItems": 3,
+        "maxItems": 3,
+        "items": {
+         "type": "array",
+         "items": {
+          "type": "number"
+         },
+         "minItems": 3,
+         "maxItems": 3
+        }
+       },
+       "registration": {
+        "type": "string"
+       },
+       "review": {
+        "type": [
+         "string",
+         "null"
+        ]
+       },
+       "inside_fraction": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+       },
+       "source": {
+        "type": "array"
+       }
+      }
+     }
+    ]
+   },
+   "segmentation": {
+    "type": [
+     "object",
+     "null"
+    ]
+   },
+   "molecules": {
+    "type": [
+     "object",
+     "null"
+    ]
+   },
+   "quality": {
+    "type": "object",
+    "required": [
+     "flags",
+     "qc_flags",
+     "drop_features",
+     "review"
+    ],
+    "properties": {
+     "flags": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "qc_flags": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "drop_features": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "review": {
+      "type": [
+       "object",
+       "null"
+      ]
+     }
+    }
+   },
+   "dedup": {
+    "type": "object",
+    "required": [
+     "content_group",
+     "group_kind",
+     "aliases"
+    ],
+    "properties": {
+     "content_group": {
+      "type": "string"
+     },
+     "group_kind": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "aliases": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "split": {
+    "enum": [
+     "train",
+     "val",
+     "test"
+    ]
+   },
+   "provenance": {
+    "type": "object",
+    "required": [
+     "pipeline",
+     "source_release",
+     "files"
+    ],
+    "properties": {
+     "pipeline": {
+      "enum": [
+       "sda-all",
+       "hesrt"
+      ]
+     },
+     "source_release": {
+      "type": "string"
+     },
+     "files": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "required": [
+        "role",
+        "path"
+       ],
+       "properties": {
+        "role": {
+         "type": "string"
+        },
+        "path": {
+         "type": "string"
+        },
+        "sha256": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "sample_folder": [
+  "image.tif",
+  "sample.json",
+  "spatial.h5ad"
+ ]
+}

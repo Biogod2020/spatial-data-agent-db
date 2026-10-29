@@ -1,0 +1,8 @@
+{
+  "source_repository": "https://github.com/YSTLab/spatial-data-agent",
+  "source_file": "src/sample_collect/pipelines/sda_all/release_contract.py",
+  "release_schema": "sda-release-sample-1",
+  "snapshot_release": "sda-unified-20261010-v3",
+  "schema_sha256": "0228f4d6610d88dc6c6edc30c79587c437d8d55cfdfaa70d54ecaaa9bea78a25",
+  "note": "Copied release schema and catalog dictionary; no scientific rules changed. Additional published schema versions need explicit support."
+}
