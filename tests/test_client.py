@@ -129,7 +129,7 @@ class ClientTests(unittest.TestCase):
         directory = download_sample(self.catalog, "GSM1", self.root / "out", include_image=True)
         self.mock_download.reset_mock()
         download_sample(self.catalog, "GSM1", self.root / "out")
-        self.assertEqual(self.mock_download.call_count, 1)
+        self.assertEqual(self.mock_download.call_count, 0)
         self.assertIn("image.tif", verify_sample(directory)["files"])
 
     def test_corrupt_download_not_installed(self) -> None:

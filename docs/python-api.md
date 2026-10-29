@@ -1,10 +1,10 @@
 # Python API
 
-Core imports require only the standard library. Hub access uses `huggingface_hub`.
+Core access uses `huggingface_hub` and `filelock`.
 AnnData, NumPy and TIFF support are optional via the `analysis` extra.
 
 ```python
-from sda_db import Catalog, download_sample, verify_sample
+from sda_db import Catalog, download_sample, verify_sample, stream_samples
 ```
 
 | Call | Result |
@@ -15,8 +15,9 @@ from sda_db import Catalog, download_sample, verify_sample
 | `catalog.get(gsm)` | Canonical GSM row; absent/alias-only IDs raise `ValueError` |
 | `catalog.search(text=None, min_obs=None, max_obs=None, **filters)` | New catalog retaining the original commit and catalog hash |
 | `selected.save_selection(path)` | JSON export of all selected rows, commit and catalog hash |
-| `download_sample(catalog, gsm, destination='downloads', include_image=False)` | Verified sample directory as a `Path` |
+| `download_sample(catalog, gsm, destination='downloads', include_image=False, storage='hub')` | Verified permanent directory; `'direct'` avoids an extra full-size copy |
 | `verify_sample(directory, require_image=False)` | Offline hash report; raises on missing/corrupt requested assets |
+| `stream_samples(catalog, gsms=None, cache_dir='.sda-cache', max_cache_bytes=10*1024**3, prefetch=1, include_image=False)` | Context-managed sample iteration with prefetch and bounded cache |
 
 Exact filters: `gsm`, `gse`, `published_gse`, `platform`, `organism`, `tissue`,
 `split`, `source_pipeline`, `source_release`, `observation_unit`, `expression_state`,
@@ -64,6 +65,14 @@ network configuration. A complete download receipt is written after all requeste
 files pass hash checks. Hash errors preserve existing files and have no automatic
 overwrite option. A partial attempt may leave verified metadata/assets; retrying
 checks and reuses them. Batch CLI downloads run sequentially, stopping on errors.
+`storage='direct'` uses destination-local staging and installs verified files
+without copying their full contents into a second destination. Completed local
+metadata are reused only when their receipt matches the repository, revision,
+GSM, sample directory and metadata hash.
+
+See [streaming](streaming.md) for sample leases, cache eviction, size admission,
+offline reuse and shutdown behavior. Streaming uses complete verified sample
+files and does not implement file-internal remote slicing.
 
 Local verification with a receipt additionally checks `sample.json` and receipt
 identity; without a receipt, `receipt_verified` is false and the check establishes

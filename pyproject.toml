@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spatial-data-agent-db"
-version = "0.1.0"
+version = "0.2.0"
 description = "Search, download and read versioned SpatialDataAgent-DB samples"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["huggingface_hub>=1.0,<2"]
+dependencies = ["huggingface_hub>=1.0,<2", "filelock>=3.12,<5"]
 
 [project.optional-dependencies]
 analysis = ["anndata>=0.10,<0.13", "numpy>=1.24,<3", "tifffile>=2024.1"]

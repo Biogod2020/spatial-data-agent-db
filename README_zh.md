@@ -78,6 +78,36 @@ adata.file.close()
 完整示例见 [examples](examples/)；图像坐标转换、降采样层级与特征处理见
 [字段说明](docs/data-dictionary.md)。
 
+## 4. 逐样本处理与受控缓存
+
+SDK 0.2 支持一边分析当前样本，一边预取后续样本；缓存按最近使用顺序回收已释放的数据。
+
+```python
+from sda_db import stream_samples
+from sda_db.io import read_sample
+
+with stream_samples(selected, cache_dir=".sda-cache", max_cache_bytes=10 * 1024**3,
+                    prefetch=1) as samples:
+    for sample in samples:
+        adata, meta = read_sample(sample.directory, verify=False)  # 交付前已经校验
+        try:
+            print(sample.gsm, adata.shape)
+        finally:
+            adata.file.close()
+```
+
+下载前先读取同一固定版本的文件大小并预留容量；容量不够时，预取等待当前样本释放。
+**进入下一次迭代前关闭 AnnData/TIFF 文件**：上一样本的缓存随后可能被删除。
+也可调用 `sample.release()` 提前释放。单个样本必须能放入指定预算，否则下载前报错。
+`max_cache_bytes` 限制样本文件及下载预留字节，另有少量回执、Hub 元数据和文件系统开销。
+
+请用专门的空目录作为缓存；同一目录同一时间由一个流式迭代器独占。
+缓存使用直接落盘模式，避免大文件在 Hub 缓存和目标目录重复存放。
+永久保存时可用 `download_sample(..., storage="direct")` 或
+`sda-db download GSM3036911 --storage direct`，仍保留完整哈希校验。
+更多选项、离线复用及提前退出行为见 [streaming.md](docs/streaming.md)，
+可运行示例见 [stream_samples.py](examples/stream_samples.py)。
+
 ## 版本与使用要点
 
 首版客户端默认固定到已有发布提交 `8f116b867ce4097957d4209db712d37bae3c9369`。

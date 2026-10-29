@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from concurrent.futures import CancelledError
 import json
 import logging
 from pathlib import Path
 import shutil
 import tempfile
+from threading import Event
 from typing import Any
 
 from .catalog import Catalog, SHA256, sha256_file
@@ -52,13 +54,25 @@ def _safe_target(root: Path, relative: str) -> Path:
     return target
 
 
-def _install(source: Path, target: Path, expected: str) -> None:
+def _install(source: Path, target: Path, expected: str, *, move: bool = False) -> None:
     """Preserve existing user files; install only verified bytes through a temporary file."""
     if target.exists():
         if sha256_file(target) != expected:
             raise ValueError(f"Existing file has different bytes: {target}; use a new destination")
+        if move and source != target:
+            source.unlink(missing_ok=True)
         return
     target.parent.mkdir(parents=True, exist_ok=True)
+    if move:
+        if sha256_file(source) != expected:
+            raise ValueError(f"SHA256 mismatch: {target.name}")
+        try:
+            target.hardlink_to(source)
+        except FileExistsError:
+            if sha256_file(target) != expected:
+                raise ValueError(f"Concurrent conflicting file: {target}")
+        source.unlink()
+        return
     temporary: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(dir=target.parent, prefix=".sda-", delete=False) as handle:
@@ -79,29 +93,60 @@ def _install(source: Path, target: Path, expected: str) -> None:
 
 
 def download_sample(catalog: Catalog, gsm: str, destination: str | Path = "downloads", *,
-                    include_image: bool = False) -> Path:
+                    include_image: bool = False, storage: str = "hub",
+                    _cancel: Event | None = None) -> Path:
     """Download one sample to destination/<commit>/samples/<GSE>/<GSM>.
 
-    Images are opt-in. Hub resumes/caches transport; existing verified local assets
-    are reused. No upload or mutation of the published database is performed.
+    Images are opt-in. storage='direct' stages Hub transfers beside their final
+    files and installs verified bytes without a second full-size copy. The
+    default 'hub' preserves shared Hub caching and offline reuse.
     """
     from huggingface_hub import hf_hub_download
 
+    if storage not in {"hub", "direct"}:
+        raise ValueError("storage must be 'hub' or 'direct'")
     row = catalog.get(gsm)
     root = Path(destination).expanduser().resolve()
     relative = f"{catalog.revision}/{row['sample_dir']}"
     directory = _safe_target(root, relative)
 
     def fetch(filename: str) -> Path:
-        return Path(hf_hub_download(catalog.repo_id, f"{row['sample_dir']}/{filename}", repo_type="dataset",
-                                   revision=catalog.revision, cache_dir=catalog.cache_dir,
-                                   local_files_only=catalog.local_files_only))
+        if _cancel is not None and _cancel.is_set():
+            raise CancelledError("Sample stream closed")
+        options: dict[str, Any] = {"cache_dir": catalog.cache_dir,
+                                   "local_files_only": catalog.local_files_only}
+        if storage == "direct":
+            staging = _safe_target(root, f"{catalog.revision}/.sda/staging/{gsm}")
+            _safe_target(root, f"{catalog.revision}/.sda/staging/{gsm}/{row['sample_dir']}/{filename}")
+            options["local_dir"] = staging
+        source = Path(hf_hub_download(catalog.repo_id, f"{row['sample_dir']}/{filename}", repo_type="dataset",
+                                     revision=catalog.revision, **options))
+        if storage == "direct" and source.resolve() != (staging / row["sample_dir"] / filename).resolve():
+            raise ValueError("Hub returned a file outside the direct download staging directory")
+        if _cancel is not None and _cancel.is_set():
+            raise CancelledError("Sample stream closed")
+        return source
 
-    metadata_source = fetch("sample.json")
+    metadata_target = _safe_target(root, f"{relative}/sample.json")
+    receipt = _safe_target(root, f"{catalog.revision}/.sda/receipts/{gsm}.json")
+    # A completed receipt binds local metadata to the same pinned source. Reusing
+    # it avoids a network request when all requested payloads are already present.
+    previous = json.loads(receipt.read_text(encoding="utf-8")) if receipt.is_file() else None
+    reuse_metadata = (isinstance(previous, dict) and previous.get("schema") == "sda-db-download-1"
+                      and previous.get("repo_id") == catalog.repo_id and previous.get("revision") == catalog.revision
+                      and previous.get("gsm") == gsm and previous.get("sample_dir") == row["sample_dir"]
+                      and metadata_target.is_file())
+    if reuse_metadata:
+        if sha256_file(metadata_target) != previous.get("files", {}).get("sample.json"):
+            raise ValueError("Local sample.json differs from its recorded receipt")
+        metadata_source = metadata_target
+    else:
+        metadata_source = fetch("sample.json")
     metadata = _read_metadata(metadata_source)
     _check_row(metadata, row)
     metadata_hash = sha256_file(metadata_source)
-    _install(metadata_source, _safe_target(root, f"{relative}/sample.json"), metadata_hash)
+    _install(metadata_source, metadata_target, metadata_hash,
+             move=storage == "direct" and metadata_source != metadata_target)
     files = {"sample.json": metadata_hash}
     assets = [("spatial.h5ad", row["expression_sha256"])]
     if include_image and row["has_image"]:
@@ -113,9 +158,8 @@ def download_sample(catalog: Catalog, gsm: str, destination: str | Path = "downl
                 raise ValueError(f"Existing file has different bytes: {target}; use a new destination")
             LOGGER.info("Reusing verified %s", filename)
         else:
-            _install(fetch(filename), target, digest)
+            _install(fetch(filename), target, digest, move=storage == "direct")
         files[filename] = digest
-    receipt = _safe_target(root, f"{catalog.revision}/.sda/receipts/{gsm}.json")
     receipt.parent.mkdir(parents=True, exist_ok=True)
     # Preserve earlier image verification when a later call requests only expression.
     image_target = _safe_target(root, f"{relative}/image.tif")

@@ -14,6 +14,11 @@ Use synthetic fixtures for download/integrity tests; tests must not fetch the
 real dataset or require approval credentials. Live read checks should be explicit,
 bounded, fixed to a commit and recorded separately.
 
+Stream tests use thread events to check prefetch overlap and capacity waits;
+avoid timing-only assertions. Keep active/prefetched samples pinned, reserve
+payload space before downloads, and evict only entries in an exclusively owned
+cache. Tests must preserve unmanaged directories and permanent downloads.
+
 The main repository references this repository as a Git submodule at
 `spatial-data-agent-db/`. Commit and push this repository first, then update its
 pointer in the main repository. From a main-repository clone:

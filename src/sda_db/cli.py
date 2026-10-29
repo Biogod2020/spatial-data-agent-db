@@ -38,6 +38,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     download.add_argument("gsm", nargs="+")
     download.add_argument("--destination", type=Path, default=Path("downloads"))
     download.add_argument("--include-image", action="store_true", help="Also download image.tif when released")
+    download.add_argument("--storage", choices=["hub", "direct"], default="hub",
+                          help="direct avoids a second full-size Hub-cache copy")
     verify = commands.add_parser("verify", help="Verify an existing sample offline")
     verify.add_argument("directory", type=Path)
     verify.add_argument("--require-image", action="store_true")
@@ -76,7 +78,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             for gsm in args.gsm:
                 catalog.get(gsm)
             for gsm in dict.fromkeys(args.gsm):
-                print(download_sample(catalog, gsm, args.destination, include_image=args.include_image))
+                print(download_sample(catalog, gsm, args.destination, include_image=args.include_image,
+                                      storage=args.storage))
         return 0
     except Exception as exc:
         # Hub exceptions may include URLs and credentials; report only their type.

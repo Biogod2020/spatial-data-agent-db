@@ -8,6 +8,7 @@ build/
 dist/
 downloads/
 .cache/
+.sda-cache/
 .env
 .env.*
 *.h5ad

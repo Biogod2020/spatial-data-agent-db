@@ -4,13 +4,14 @@ Find relevant spatial transcriptomics samples, download the files you need, and
 read expression, coordinates and images with their release metadata.
 
 [中文使用说明](README_zh.md) · [Data dictionary](docs/data-dictionary.md) ·
-[Python API](docs/python-api.md) · [Examples](examples/) · [Validation](docs/validation.md) ·
+[Python API](docs/python-api.md) · [Streaming](docs/streaming.md) · [Examples](examples/) · [Validation](docs/validation.md) ·
 [Database on Hugging Face](https://huggingface.co/datasets/Biogod/SpatialDataAgent-DB)
 
 This repository is the user-facing companion to
 [SpatialDataAgent](https://github.com/YSTLab/spatial-data-agent). It works independently
 of the discovery and curation pipeline. The database stays on Hugging Face; this
 repository contains a small Python client, CLI, documentation and examples.
+Changes between SDK versions are recorded in [CHANGELOG.md](CHANGELOG.md).
 
 ## Start here
 
@@ -116,9 +117,36 @@ Use [the reading example](examples/read_sample.py) to inspect features and apply
 the explicit `drop_features` annotation in memory. The toolkit does not normalize
 expression, filter observations or change units automatically.
 
+## Stream samples with a disk budget
+
+Version 0.2 adds bounded sample streaming: analyze one verified sample while the
+next is prefetched, and let the SDK recycle released cache entries.
+
+```python
+from sda_db import stream_samples
+
+with stream_samples(selected, cache_dir=".sda-cache", max_cache_bytes=10 * 1024**3,
+                    prefetch=1) as samples:
+    for sample in samples:
+        adata, metadata = read_sample(sample.directory, verify=False)
+        try:
+            print(sample.gsm, adata.shape)
+        finally:
+            adata.file.close()
+```
+
+Close files before advancing: the previous sample's cache directory may be
+evicted. File sizes are reserved before transfer, images remain opt-in, and each
+sample must fit within the payload budget. The dedicated cache stores one
+full-size copy of each asset, with additional small bookkeeping files.
+For permanent downloads with the same direct transfer mode, use
+`download_sample(..., storage="direct")` or `sda-db download ... --storage direct`.
+See [streaming and cache lifetimes](docs/streaming.md) and the
+[runnable example](examples/stream_samples.py).
+
 ## Choose a database version
 
-Version 0.1.0 defaults to commit
+The client defaults to commit
 `8f116b867ce4097957d4209db712d37bae3c9369`, recorded in
 [releases.json](releases.json). This keeps examples reproducible as the database
 grows. To intentionally inspect a newer version:

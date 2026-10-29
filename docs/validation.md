@@ -1,4 +1,43 @@
-# Version 0.1.0 validation
+# Client validation
+
+## Version 0.2.0
+
+Validated on 2026-10-29, with the same database commit as version 0.1 below.
+
+- **45 offline tests passed** with socket connections disabled. Added coverage
+  includes ordered delivery, overlapping prefetch, bounded queueing, capacity
+  backpressure, active leases, LRU eviction, oversized-sample admission, image
+  upgrades, offline reuse, exclusive cache ownership, shutdown during a capacity
+  wait and active transfer, corruption, fixed-commit HEAD checks, size mismatches
+  and direct installation without an SDK payload copy.
+- The 0.2 wheel built and installed independently of the main repository and
+  optional analysis packages. Its 41 core tests passed, with four NumPy coordinate
+  tests skipped in the minimal environment. The CLI exposes `--storage direct`.
+- A bounded live read delivered **two real samples**, with a total payload of
+  **24,639,264 bytes**, under a **16,258,695-byte** sample-payload cache budget.
+  Both samples passed SHA256 and receipt verification. The first was evicted
+  after release; the second was reused offline from the managed cache.
+- At the end, the managed cache held one expression file and the dedicated Hub
+  cache held no expression-file snapshot. No full-size copy remained in direct
+  staging. The retained sample was also read as backed CSR AnnData.
+
+| Sample | Metadata bytes | Expression bytes |
+|---|---:|---:|
+| GSE111672 / GSM3036911 | 3,834 | 16,254,861 |
+| GSE111672 / GSM3405534 | 3,845 | 8,376,724 |
+
+Live access used Hub 1.10.1 with the existing approved read credential and the
+host's registered direct DNS/TLS transport in an isolated child. The independent
+installation used Hub 1.33.0. The transport/configuration and downloaded assets
+remain outside Git. This was a functional cache/eviction check, not a throughput
+benchmark; image transport remained covered by synthetic tests. No model calls,
+database publication or scientific reclassification occurred.
+
+The payload budget excludes small receipts, Hub bookkeeping and filesystem
+allocation overhead. An active Hub file is allowed to finish during stream
+shutdown. See [streaming behavior](streaming.md) for these operational details.
+
+## Version 0.1.0
 
 Validated on 2026-10-29. The checks below concern the user client; no new
 classification, standardization, human review or database publication was run.
