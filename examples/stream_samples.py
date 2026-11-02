@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import argparse
 
-from sda_db import Catalog, DEFAULT_REVISION, stream_samples
+from sda_db import Catalog, stream_samples
 from sda_db.io import read_sample
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--revision", default=DEFAULT_REVISION)
+    parser.add_argument("--release", default=None, help="release name or commit (default: paper release)")
     parser.add_argument("--platform", default="Visium")
     parser.add_argument("--organism", default="Homo sapiens")
     parser.add_argument("--limit", type=int, default=2)
@@ -21,7 +21,7 @@ def main() -> None:
     args = parser.parse_args()
     if args.limit < 1 or args.cache_gib <= 0:
         parser.error("--limit and --cache-gib must be positive")
-    selected = Catalog.from_hub(revision=args.revision).search(platform=args.platform,
+    selected = Catalog.open(args.release).search(platform=args.platform,
                                                               organism=args.organism, split="train")
     gsms = [row["gsm"] for row in selected.rows[:args.limit]]
     with stream_samples(selected, gsms, cache_dir=args.cache_dir, max_cache_bytes=int(args.cache_gib * 1024**3),

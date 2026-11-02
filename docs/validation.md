@@ -1,5 +1,56 @@
 # Client validation
 
+## Version 0.3.0
+
+Validated on 2026-11-02 against the paper release `v1.0.0-20261025` (commit
+`999566bf516169ba8c9cf1ad9e5a2b722bb8a97a`) and `latest` (`e1ba100b8e21d5e966c71a478886287647ccb870`).
+
+**Offline tests.** 109 tests passed with socket connections disabled: the 45 tests of 0.2, unchanged in what
+they assert, plus 64 new ones. Twelve of the new tests are regression tests for confirmed findings of an
+independent code review. The new tests cover:
+
+- ranking, phrases, exclusions, prefixes, aliases, operators, typo errors and suggestions;
+- facets, studies, cards, exports and selection replay;
+- citations;
+- release resolution and mirror hash binding;
+- size plans, size limits, and parallel downloads in both error modes;
+- error translation, including over-quota disks;
+- the CLI JSON contract and exit codes;
+- the MCP protocol (negotiation, tool schemas, results, notifications, batches, the stdio loop);
+- AnnData loading and pyramidal TIFF reads, on a synthetic sample.
+
+**Packaging.** A wheel built from this tree was run with `uvx` in a clean environment. It contains the
+release registry and field documentation. `sda-db releases` and an ungated search worked.
+
+**Live acceptance.** `tests/live_acceptance.py` ran in 13 s, and again in 9.9 s after the review fixes. Every check passed:
+
+| Check | Result |
+|---|---|
+| Search without a token (`HF_TOKEN` unset, implicit token disabled, empty cache) | passed; catalog read from `Biogod/SpatialDataAgent-DB-Catalog@2ae26e0`, the three catalog files matched the recorded SHA256 |
+| Paper release | 12,163 samples, 1,265 published series |
+| Download plan | 2 samples with images (GSM9448988 Xenium DAPI, GSM8915497 Visium H&E): 10,072,950 bytes from the release file manifest |
+| Parallel download with `max_bytes="20MB"` | 2 downloaded, 0 failed; receipts verified offline with `require_image=True` |
+| `load` and `read_patch` | AnnData 1,142 × 17,943; 64 × 64 × 3 H&E patch centred on the first spot |
+| `sda-db mcp` over stdio | protocol 2025-06-18 negotiated, 12 tools, ranked search (262 matches), a 214.6 GB Xenium download refused with `size_limit` |
+| `latest` | resolved to `e1ba100`; 12,232 samples, including 69 reviewed daily additions |
+
+**Further manual checks.**
+
+- **MCP interoperability.** The official MCP Python client (`mcp` 2.3.0) connected over stdio and negotiated
+  protocol 2025-11-25. All 12 tools returned results; typo and unknown-argument errors came back as tool
+  errors with hints.
+- **No-token experience.** `sda-db doctor` reported the missing dataset approval with the fix. A download
+  exited with code 4 (`access_denied`) and the same hint.
+- **Approved account.** `doctor` reported every check as passing.
+- **Search quality.** "alzheimer" matched 452 samples in 27 studies (0 in 0.2), and `platform=visum` was
+  answered with `'Visium', 'Visium HD'`.
+- **Disk quota.** A real over-quota home directory produced `[Errno 122]`. The client now reports it as
+  `disk_full` (exit 8), with a hint to move the cache.
+
+**Environment.** Python 3.11.16, huggingface_hub 1.33.0, anndata 0.12.19, NumPy 2.4.6, tifffile 2026.3.3 and
+zarr 3.1.6, using the standard Hub login and a local proxy. Downloads stayed bounded at about 30 MB in total.
+The validation published nothing to the dataset, made no model calls and changed no scientific labels.
+
 ## Version 0.2.0
 
 Validated on 2026-10-29, with the same database commit as version 0.1 below.

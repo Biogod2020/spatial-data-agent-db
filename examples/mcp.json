@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "sda-db": {
+      "command": "sda-db",
+      "args": ["mcp"],
+      "env": {
+        "SDA_DB_DOWNLOAD_DIR": "/data/sda-db",
+        "SDA_DB_MAX_DOWNLOAD_BYTES": "50000000000"
+      }
+    }
+  }
+}

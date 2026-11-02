@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import argparse
 
-from sda_db import Catalog, DEFAULT_REVISION, download_sample
+from sda_db import Catalog, download_sample
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--revision", default=DEFAULT_REVISION)
+    parser.add_argument("--release", default=None, help="release name or commit (default: paper release)")
     parser.add_argument("--platform", default="Visium")
     parser.add_argument("--organism", default="Homo sapiens")
     parser.add_argument("--limit", type=int, default=1)
@@ -19,7 +19,7 @@ def main() -> None:
     args = parser.parse_args()
     if args.limit < 1:
         parser.error("--limit must be positive")
-    catalog = Catalog.from_hub(revision=args.revision)
+    catalog = Catalog.open(args.release)
     selected = catalog.search(platform=args.platform, organism=args.organism, split="train")
     selected.save_selection("selection.json")
     print(f"{len(selected.rows)} matches at commit {selected.revision}")

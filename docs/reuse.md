@@ -19,12 +19,16 @@ harmonizing metadata should produce a derived analysis with its own provenance.
 
 Record these items with your analysis:
 
-- Dataset identifier `Biogod/SpatialDataAgent-DB` and full Hugging Face commit.
-- Toolkit version, selected GSMs, catalog SHA256 and download receipts.
+- Dataset identifier `Biogod/SpatialDataAgent-DB`, release name and full Hugging Face commit.
+- Toolkit version, selected GSMs, catalog SHA256 and download receipts. `selection.save_selection()` or
+  `sda-db search ... --output cohort.json` records all of these, and `Catalog.from_selection()` replays them.
 - Relevant original GEO accessions and original study/publication citations.
 - All additional feature, observation, image or QC inclusion rules.
 
-Database access and reuse follow the dataset card and original source conditions
-at the commit used. This toolkit does not relicense the original studies or
-grant access to data. No paper DOI or blanket data license is invented here;
-use the citation information supplied by the database and the original studies.
+`sda-db cite` (or `catalog.cite()`) writes BibTeX for three things: the database paper (bioRxiv,
+doi:10.64898/2026.05.27.727615, metadata from Crossref), the release with its commit, and every GEO series of
+the selection, with the PubMed IDs and DOIs that the release records.
+
+Database access and reuse follow the dataset card and the original source conditions at the commit used.
+This toolkit does not relicense the original studies or grant access to data, and it adds no blanket data
+license.

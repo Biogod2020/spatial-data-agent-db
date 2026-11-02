@@ -1,5 +1,100 @@
 # Changelog
 
+## 0.3.0 — 2026-11-02
+
+Agent-ready release: search without an account, ranked keyword search, cohort tooling, an MCP server and a
+rewritten CLI.
+
+**Releases**
+
+- Added a named release registry, shipped with the package.
+  - The default is now the paper release `v1.0.0-20261025` (commit `999566b`), which matches the dataset card.
+    Version 0.2 pinned `8f116b8`, which has the same samples and files and is still available as `2026-10-29`.
+  - `latest` resolves `main` to one commit.
+
+**Search**
+
+- `Catalog.open()` reads the catalog of the paper release from the ungated mirror. Each mirrored file is
+  checked against the SHA256 recorded for the release, so searching needs no account. Sample downloads still
+  use the gated dataset at the release commit.
+- The catalog joins the release's atlas metadata: study title, summary, design and PubMed IDs; reported
+  disease, condition, age, sex and donor; publication; and counts evidence.
+- Keyword search is ranked with BM25 over sample fields and study text.
+  - Every term must match; `match="any"`, phrases, exclusions and prefixes are supported.
+  - Terms with no match in the release are reported.
+  - "alzheimer" now finds 452 samples in 27 studies; it found 0 in 0.2.
+- Filters accept any field.
+  - Values ignore case, spaces and hyphens, and accept common names (`human`, `visium hd`) and lists (OR).
+  - Multi-valued fields match any member.
+  - `where` expressions support `= != ~ !~ > >= < <=`, `|` and missing values.
+  - A misspelled field or controlled value raises an error naming the closest valid values.
+- New methods: `fields()`, `values()`, `summary(by=...)`, `list_studies()`, `study()`, `card()`, `select()`,
+  `head()`, `compact()`, `to_pandas()`, `export()` (json/csv/tsv/jsonl/parquet), `from_selection()` and
+  `cite()` (BibTeX/text/JSON for the paper, the release and every GEO series).
+
+**Downloads**
+
+- `plan_download()` gives bytes per sample and in total (from the release manifest), local reuse and free
+  space, before any transfer.
+- `download()` fetches samples in parallel, with a `max_bytes` limit, `on_error="continue"` and a saved
+  report.
+
+**Reading**
+
+- `sda_db.load()` goes from a GSM to AnnData in one call, recording release, commit, units and the full
+  sample.json in `adata.uns['sda_db']`. It can also drop the listed features.
+- `sda_db.image` reads pyramid levels, regions (tile-wise), thumbnails and exact-size patches.
+- `describe_sample()` gives a compact summary of a downloaded sample.
+
+**Errors**
+
+- Typed errors with stable codes and hints: `AccessError`, `NotFoundError`, `UnknownFieldError`,
+  `UnknownValueError`, `IntegrityError`, `NetworkError`, `SizeLimitError` and `DiskFullError`. The ones that
+  replace 0.2 `ValueError`s still subclass `ValueError`.
+
+**CLI**
+
+- New commands: `search`, `fields`, `values`, `summary`, `show`, `download` (`--dry-run`, `--max-size`, a
+  20 GB guard, `--workers`, `--keep-going`, `--from FILE|-`), `verify` (whole folders), `inspect`, `cite`,
+  `releases`, `doctor` and `mcp`.
+- Tables on a terminal and compact JSON when piped, with errors as JSON on stderr. Exit codes 2–8 by error
+  class.
+
+**Agents**
+
+- `sda-db mcp` is a dependency-free MCP stdio server with 12 tools.
+  - It negotiates protocol versions and sends server instructions.
+  - Downloads are plan-first and capped in size, and they write only to a server-controlled directory.
+- Added an agent skill (`skills/sda-db/SKILL.md`), `AGENTS.md` and `llms.txt`.
+
+**Breaking changes**
+
+- The first positional argument of `Catalog.search` is now a ranked keyword query, in which every term must
+  match a word. In 0.2 it was a literal substring.
+  - If no keyword matches at all, the search falls back to the 0.2 substring match and adds a warning, so
+    `search("hippo")` still works.
+  - The old behaviour stays available as `text=`.
+- Unknown values of controlled fields (platform, organism, split…) now raise `UnknownValueError`. It is a
+  `ValueError` subclass with suggestions; 0.2 returned an empty selection.
+- The default release moved from `8f116b8` to the paper tag commit `999566b`, so default downloads go to
+  `downloads/999566b…/`.
+
+**Docs and tests**
+
+- New and rewritten docs: CLI reference, agents and MCP, cookbook, Python API.
+- 109 offline tests (64 new), plus a bounded live acceptance script (`tests/live_acceptance.py`).
+- Fixed before release, after an independent code review:
+  - negated `-prefix*` and `-"phrase"` terms;
+  - queries made only of exclusions;
+  - `--from` with CSV, JSONL and search JSON;
+  - ids/csv output stopping at 20 rows;
+  - stopping downloads on Ctrl-C;
+  - a fail-closed size guard;
+  - strict MCP argument types and UTF-8 stdio;
+  - SuperSeries study aggregates;
+  - the order of ties in descending sorts;
+  - half-up rounding of patch origins.
+
 ## 0.2.0 — 2026-10-29
 
 - Added `stream_samples`: ordered delivery of verified samples with one background
