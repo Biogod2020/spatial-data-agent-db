@@ -37,6 +37,8 @@ uvx --from "git+https://github.com/Biogod2020/spatial-data-agent-db" sda-db sear
 ```bash
 sda-db search alzheimer hippocampus --organism human        # 排序检索；不下载，不需登录
 sda-db values tissue --platform Xenium --top 15            # 先看某个字段有哪些取值
+sda-db search --gene GFAP --gene AQP4 --platform Xenium    # 面板同时测了这两个基因的样本
+sda-db features GSM9448988 --contains CD                   # 不下载即可查看样本测了哪些基因
 sda-db show GSM8185219                                     # 单个样本的全部信息
 sda-db download GSM8185219 --dry-run                       # 传输前先看大小
 sda-db download GSM8185219                                 # 按 SHA256 校验，并生成下载凭据
@@ -80,8 +82,8 @@ adata.uns["sda_db"]                              # 版本、提交、单位、�
 claude mcp add sda-db -- sda-db mcp                       # Claude Code
 ```
 
-服务器不依赖额外的包，提供 12 个工具：`search_samples`、`field_values`、`list_fields`、`summarize`、`get_sample`、
-`get_study`、`plan_download`、`download_samples`、`inspect_sample`、`cite`、`list_releases` 和 `check_access`。
+服务器不依赖额外的包，提供 13 个工具：`search_samples`（关键词、过滤条件和基因）、`field_values`、`list_fields`、
+`summarize`、`get_sample`、`get_study`、`list_features`、`plan_download`、`download_samples`、`inspect_sample`、`cite`、`list_releases` 和 `check_access`。
 
 下载遵循“先规划”的原则：
 
@@ -100,6 +102,7 @@ Claude Desktop、Codex、Cursor、Gemini CLI 和 VS Code 的配置方法见 [AI 
 | `"spinal cord"` · `-mouse` · `neuro*` | 短语 · 排除 · 前缀 |
 | `--platform "visium hd"` · `--organism human` | 精确值；忽略大小写、空格和连字符，接受常用名；重复即为“或” |
 | `--tissue cortex` · `--disease glioma` | GEO 原文中的子串，不区分大小写 |
+| `--gene GFAP --gene AQP4`（`--gene-any`） | 测量了这些特征的样本：基因符号或 Ensembl ID，不区分大小写；“测量了”不等于“检测到” |
 | `--where "n_obs>=50000"` · `"split=train\|val"` · `"disease="` | 任意字段：`=`、`!=`、`~`（包含）、`!~`、`>`、`>=`、`<`、`<=`；`\|` 表示“或”；值为空表示缺失 |
 
 拼错字段名或受控取值时会报错，并给出最接近的候选值（如 `platform='Visum'` → `'Visium', 'Visium HD'`）。

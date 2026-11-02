@@ -85,3 +85,19 @@ def write_catalog_files(root: Path) -> dict[str, Path]:
     paths["catalog/atlas-study-metadata.jsonl"].write_text("".join(json.dumps(s) + "\n" for s in STUDIES))
     paths["catalog/atlas-sample-metadata.jsonl"].write_text("".join(json.dumps(s) + "\n" for s in SAMPLE_RECORDS))
     return paths
+
+
+def feature_index_file(root: Path, catalog_sha256: str = "") -> Path:
+    """A synthetic feature index: GSM1/GSM2 share a human panel, GSM3 is a mouse panel, GSM4 differs."""
+    from sda_db.features import write_index
+
+    human = [["GFAP", "ENSG00000131095", "Gene Expression"], ["AQP4", "ENSG00000171885.15", "Gene Expression"]]
+    mouse = [["Gfap", "ENSMUSG00000020932", "Gene Expression"], ["Snap25", "ENSMUSG00000027273", "Gene Expression"]]
+    other = [["ERBB2", "ENSG00000141736", "Gene Expression"], ["CD3E_protein", "CD3E", "Antibody Capture"],
+             ["GRCh38_ESR1", "GRCh38_ENSG00000091831", "Gene Expression"]]
+    whole = [[f"G{i}", f"ID{i}", "Gene Expression"] for i in range(30)] + [["GFAP", "ENSG00000131095.9",
+                                                                             "Gene Expression"]]
+    path = root / f"feature-index-{catalog_sha256[:4] or 'x'}.sqlite"
+    write_index([human, mouse, other, whole], {"GSM1": 0, "GSM2": 0, "GSM3": 1, "GSM4": 2, "GSM5": 3}, path,
+                catalog_sha256=catalog_sha256, targeted_max=10)
+    return path

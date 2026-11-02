@@ -147,6 +147,7 @@ class Catalog:
     scores: dict[str, float] | None = field(default=None, repr=False)
     warnings: list[str] = field(default_factory=list, repr=False)
     report: dict[str, Any] | None = field(default=None, repr=False)
+    gene_matches: dict[str, list[str]] | None = field(default=None, repr=False)
     _shared: dict[str, Any] | None = field(default=None, repr=False)
     _by_gsm: dict[str, dict[str, Any]] = field(init=False, repr=False)
 
@@ -344,8 +345,8 @@ class Catalog:
         return self._derive([dict(self._by_gsm[g]) for g in identifiers])
 
     def head(self, n: int = 10) -> Catalog:
-        return self._derive([dict(r) for r in self.rows[:n]],
-                            scores=self.scores, warnings=list(self.warnings), report=self.report)
+        return self._derive([dict(r) for r in self.rows[:n]], scores=self.scores, warnings=list(self.warnings),
+                            report=self.report, gene_matches=self.gene_matches)
 
     # ---------------------------------------------------------------- search
     def _vocabulary(self) -> Vocabulary:
@@ -358,9 +359,30 @@ class Catalog:
             self._shared["index"] = TextIndex(self._shared["rows"], self.studies)
         return self._shared["index"]
 
+    def feature_index(self, path: str | Path | None = None) -> Any:
+        """The release's measured-feature index (downloaded once, SHA256-checked; see sda_db.features)."""
+        from .features import load_feature_index
+
+        key = ("features", str(path) if path else None)
+        if key not in self._shared:
+            self._shared[key] = load_feature_index(self, path)
+        return self._shared[key]
+
+    def features(self, gsm: str, *, feature_index: str | Path | None = None) -> dict[str, Any]:
+        """Features measured in one sample, without downloading it.
+
+        Returns {'features': n, 'feature_types': {...}, 'listed': bool, 'rows': [...] or None}; full rows are
+        stored for targeted panels (up to 10,000 features), counts for whole-transcriptome panels.
+        """
+        self.get(gsm)
+        index = self.feature_index(feature_index)
+        info = index.panel_info(gsm)
+        return {**info, "rows": index.features(gsm) if info["listed"] else None}
+
     def search(self, query: str | None = None, *, where: str | Sequence[str] | None = None,
                text: str | None = None, min_obs: int | None = None, max_obs: int | None = None,
-               match: str = "all", sort: str | None = None, **filters: Any) -> Catalog:
+               match: str = "all", sort: str | None = None, genes: str | Sequence[str] | None = None,
+               gene_match: str = "all", feature_index: str | Path | None = None, **filters: Any) -> Catalog:
         """Select samples by ranked keywords and structured filters (all ANDed).
 
         - ``query``: keywords over sample fields (tissue, disease, organism, platform, IDs)
@@ -374,6 +396,9 @@ class Catalog:
         - ``where``: expressions such as ``'n_obs>=1000'``, ``'tissue~cortex'``,
           ``'platform!=Visium'``, ``'disease='`` (missing) or ``'split=train|val'``.
         - ``text``: literal substring over all catalog values (client 0.1 behaviour).
+        - ``genes``: samples whose measured features include all (``gene_match='any'``: any) of these
+          symbols or IDs, case-insensitively, from the release's feature index. Measured is not detected,
+          and whole-transcriptome assays measure almost every gene.
 
         This is deterministic metadata search; it makes no model calls.
         """
@@ -407,9 +432,23 @@ class Catalog:
             needle = text.casefold()
             selected = [row for row in selected
                         if needle in " ".join(str(v) for v in row.values() if v is not None).casefold()]
+        gene_matches: dict[str, list[str]] | None = None
+        if genes:
+            wanted = [genes] if isinstance(genes, str) else list(genes)
+            wanted = [g for item in wanted for g in re.split(r"[,\s]+", str(item)) if g]
+            index = self.feature_index(feature_index)
+            gene_matches, gene_counts = index.match(wanted, (r["gsm"] for r in selected), mode=gene_match)
+            for gene, count in gene_counts.items():
+                if not index.panels_with(gene):
+                    close = index.suggest(gene)
+                    warnings.append(f"No sample measures {gene!r}" + (f"; similar: {', '.join(close)}" if close else ""))
+            selected = [r for r in selected if r["gsm"] in gene_matches]
+            conditions.append(Condition("genes", "=" if gene_match == "all" else "~", tuple(wanted)))
         scores: dict[str, float] | None = None
         report: dict[str, Any] = {"filters": [c.describe() for c in conditions], "query": query,
                                   "matched_before_query": len(selected)}
+        if gene_matches is not None:
+            report["gene_counts"] = gene_counts
         if query and query.strip():
             scores, text_report = self._index().search(query, within=(r["gsm"] for r in selected), match=match)
             report.update(text_report)
@@ -442,10 +481,11 @@ class Catalog:
         if sort:
             selected = _sorted(selected, sort, vocabulary)
         report["total"] = len(selected)
-        if not selected and (filters or where or query):
+        if not selected and (filters or where or query or genes):
             warnings.append("No samples matched. Relax a filter, use FIELD~TEXT substrings, "
                             "or inspect values with 'sda-db values FIELD'.")
-        return self._derive([dict(r) for r in selected], scores=scores, warnings=warnings, report=report)
+        return self._derive([dict(r) for r in selected], scores=scores, warnings=warnings, report=report,
+                            gene_matches=gene_matches if gene_matches is not None else self.gene_matches)
 
     # ---------------------------------------------------------------- describing
     def fields(self) -> list[dict[str, Any]]:
@@ -618,6 +658,8 @@ class Catalog:
             record = {k: row.get(k) for k in SUMMARY_FIELDS if k != "study_title" and row.get(k) not in (None, "")}
             if self.scores is not None:
                 record["score"] = self.scores.get(row["gsm"])
+            if self.gene_matches is not None:
+                record["matched_features"] = self.gene_matches.get(row["gsm"])
             samples.append(record)
             studies.setdefault(row["published_gse"], row.get("study_title"))
         return {"samples": samples, "studies": studies}

@@ -70,6 +70,17 @@ class CliTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.run_cli("search", "tumour", "--bogus-option")
 
+    def test_gene_flags_and_features_command(self) -> None:
+        index = fixtures.feature_index_file(self.root)
+        status, out, _ = self.run_cli("search", "--gene", "GFAP", "--gene", "aqp4", "--feature-index", str(index))
+        payload = json.loads(out)
+        self.assertEqual([r["gsm"] for r in payload["samples"]], ["GSM1", "GSM2"])
+        self.assertIn("genes=GFAP|aqp4", payload["filters"])
+        status, out, _ = self.run_cli("features", "GSM4", "--contains", "cd3", "--feature-index", str(index))
+        self.assertEqual(json.loads(out)["rows"][0]["feature_name"], "CD3E_protein")
+        status, out, _ = self.run_cli("features", "GSM5", "--feature-index", str(index))
+        self.assertIn("Whole-transcriptome", json.loads(out)["note"])
+
     def test_unknown_value_exits_2_with_structured_error(self) -> None:
         status, out, err = self.run_cli("search", "--platform", "visum")
         self.assertEqual((status, out), (2, ""))
@@ -181,7 +192,7 @@ class McpTests(unittest.TestCase):
 
     def test_tool_schemas_are_valid_objects(self) -> None:
         tools = self.request("tools/list")["result"]["tools"]
-        self.assertEqual(len(tools), 12)
+        self.assertEqual(len(tools), 13)
         for tool in tools:
             schema = tool["inputSchema"]
             self.assertEqual(schema["type"], "object")
@@ -211,6 +222,15 @@ class McpTests(unittest.TestCase):
         self.assertTrue(self.call("field_values")["isError"])  # required argument
         self.assertEqual(self.request("tools/call", ["search_samples"])["error"]["code"], -32602)
         self.assertEqual(self.server.handle([])["error"]["code"], -32600)
+
+    def test_gene_arguments_and_feature_tool(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            index = fixtures.feature_index_file(Path(folder))
+            with patch.dict("os.environ", {"SDA_DB_FEATURE_INDEX": str(index)}):
+                found = self.call("search_samples", genes="GFAP, Snap25", gene_match="any")["structuredContent"]
+                self.assertEqual([r["gsm"] for r in found["samples"]], ["GSM1", "GSM2", "GSM3", "GSM5"])
+                listed = self.call("list_features", gsm="GSM3", contains="snap")["structuredContent"]
+                self.assertEqual(listed["rows"][0]["source_feature_id"], "ENSMUSG00000027273")
 
     def test_size_cap_accepts_zero_and_unit_strings(self) -> None:
         self.assertEqual(Server(max_download_bytes=0).max_download_bytes, 0)

@@ -59,6 +59,10 @@ _FILTERS: dict[str, Any] = {
     "max_obs": {"type": "integer", "description": "Maximum observations."},
     "where": {"type": "array", "items": {"type": "string"}, "description": "Extra conditions: FIELD=V, FIELD!=V, "
               "FIELD~TEXT, FIELD>=N, FIELD<=N; '|' = OR; empty value = missing. Example: ['n_vars>=5000']."},
+    "genes": {"type": "string", "description": "Only samples whose measured features include these genes or "
+              "feature IDs (comma or space separated, any case). Measured is not detected; whole-transcriptome "
+              "samples measure almost all genes, so add where=['n_vars<=10000'] to find targeted panels."},
+    "gene_match": {"type": "string", "enum": ["all", "any"], "description": "With several genes: all (default) or any."},
     "match": {"type": "string", "enum": ["all", "any"], "description": "Keyword logic (default all)."},
     "sort": {"type": "string", "description": "Sort by field; prefix '-' for descending, e.g. '-n_obs'."},
     "release": {"type": "string", "description": "Release name, 'latest' or commit (default: paper release)."},
@@ -115,10 +119,11 @@ class Server:
             if args.get(name):
                 where.append(f"{name}~{args[name]}")
         if filters or where or args.get("query") or args.get("min_obs") is not None or args.get("max_obs") is not None \
-                or args.get("sort"):
+                or args.get("sort") or args.get("genes"):
             selection = selection.search(args.get("query"), where=where, min_obs=args.get("min_obs"),
                                          max_obs=args.get("max_obs"), match=args.get("match", "all"),
-                                         sort=args.get("sort"), **filters)
+                                         sort=args.get("sort"), genes=args.get("genes") or None,
+                                         gene_match=args.get("gene_match", "all"), **filters)
         return selection
 
     @staticmethod
@@ -227,6 +232,28 @@ class Server:
                     card["sample_json_error"] = exc.to_dict()
             return card
 
+        @tool("list_features", "List measured features",
+              "Genes/features measured in one sample (name, source ID, type), from the release's feature "
+              "index; no download. Use 'contains' to check for specific genes.",
+              _schema({"gsm": {"type": "string"}, "contains": {"type": "string"},
+                       "limit": {"type": "integer", "description": "Features to return (default 100, max 2000)."},
+                       "release": _FILTERS["release"]}, ["gsm"]))
+        def list_features(args: dict[str, Any]) -> dict[str, Any]:
+            catalog = self.catalog(args.get("release"))
+            info = catalog.features(args["gsm"])
+            rows = info.pop("rows")
+            if rows is None:
+                return {**self._envelope(catalog), "gsm": args["gsm"], **info,
+                        "note": "Whole-transcriptome panel: counts only. Test genes with search_samples(genes=..., "
+                                f"gsms='{args['gsm']}')."}
+            if args.get("contains"):
+                needle = args["contains"].casefold()
+                rows = [r for r in rows if needle in r["feature_name"].casefold()
+                        or needle in r["source_feature_id"].casefold()]
+            limit = max(1, min(int(args.get("limit", 100)), 2000))
+            return {**self._envelope(catalog), "gsm": args["gsm"], **info, "matching": len(rows),
+                    "shown": min(limit, len(rows)), "rows": rows[:limit], "truncated": len(rows) > limit}
+
         @tool("get_study", "Get study details",
               "Title, summary, design, PubMed IDs, aggregate counts and compact sample rows for one GEO series.",
               _schema({"gse": {"type": "string"}, "release": _FILTERS["release"]}, ["gse"]))
@@ -324,7 +351,7 @@ class Server:
             return run(release=args.get("release") or self.default_release, destination=self.download_dir)
 
     def _require_selection(self, args: dict[str, Any]) -> Catalog:
-        keys = set(_FILTERS) - {"release", "match", "sort"}
+        keys = set(_FILTERS) - {"release", "match", "sort", "gene_match"}
         if not any(args.get(k) not in (None, "", []) for k in keys):
             raise NotFoundError("Nothing selected", hint="Pass gsms, gse, query or filters.")
         selection = self._select(args)

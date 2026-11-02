@@ -41,6 +41,8 @@ uvx --from "git+https://github.com/Biogod2020/spatial-data-agent-db" sda-db sear
 ```bash
 sda-db search alzheimer hippocampus --organism human        # ranked; no download, no login
 sda-db values tissue --platform Xenium --top 15            # learn the vocabulary of a field
+sda-db search --gene GFAP --gene AQP4 --platform Xenium    # samples whose panel measures both genes
+sda-db features GSM9448988 --contains CD                   # genes a sample measures, without downloading
 sda-db show GSM8185219                                     # everything about one sample
 sda-db download GSM8185219 --dry-run                       # sizes before any transfer
 sda-db download GSM8185219                                 # verified against SHA256, with a receipt
@@ -103,9 +105,9 @@ Register the MCP server once and an agent can search, inspect, plan, download an
 claude mcp add sda-db -- sda-db mcp                       # Claude Code
 ```
 
-The server needs no extra packages. It offers 12 tools: `search_samples`, `field_values`, `list_fields`,
-`summarize`, `get_sample`, `get_study`, `plan_download`, `download_samples`, `inspect_sample`, `cite`,
-`list_releases` and `check_access`. Downloads are plan-first. They need `confirm=true`, stop above a size
+The server needs no extra packages. It offers 13 tools: `search_samples` (keywords, filters and genes),
+`field_values`, `list_fields`, `summarize`, `get_sample`, `get_study`, `list_features`, `plan_download`,
+`download_samples`, `inspect_sample`, `cite`, `list_releases` and `check_access`. Downloads are plan-first. They need `confirm=true`, stop above a size
 limit you set, and write only to a directory you choose. Configuration for Claude Desktop, Codex, Cursor,
 Gemini CLI and VS Code is in [AI agents and MCP](docs/agents.md). An agent without MCP can use the JSON CLI
 with the [agent skill](skills/sda-db/SKILL.md).
@@ -118,6 +120,7 @@ with the [agent skill](skills/sda-db/SKILL.md).
 | `"spinal cord"` · `-mouse` · `neuro*` | Phrase · exclude · prefix |
 | `--platform "visium hd"` · `--organism human` | Exact values. Case, spaces and hyphens are ignored, and common names work. Repeat for OR. |
 | `--tissue cortex` · `--disease glioma` | Case-insensitive substring of the GEO text |
+| `--gene GFAP --gene AQP4` (`--gene-any`) | Samples that measure these features: symbols or Ensembl IDs, any case. Measured is not the same as detected. |
 | `--where "n_obs>=50000"` · `"split=train\|val"` · `"disease="` | Any field: `=`, `!=`, `~` (contains), `!~`, `>`, `>=`, `<`, `<=`, `\|` for OR, empty for missing |
 
 Search is deterministic. It runs offline after the first catalog download and makes no model calls.

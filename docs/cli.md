@@ -26,6 +26,7 @@ must hold (AND):
 | `--split train\|val\|test`, `--stain "H&E"`, `--has-image`/`--no-image` | Exact |
 | `--min-obs N`, `--max-obs N` | Observation count bounds (inclusive) |
 | `--where EXPR` | Any field: `FIELD=V`, `!=`, `~` (contains), `!~`, `>`, `>=`, `<`, `<=`; `\|` = OR; `FIELD=` = missing |
+| `--gene G` (repeat = AND; `--gene-any` = OR) | Samples whose measured features include G: a symbol or Ensembl ID, any case, with version suffixes ignored |
 | `--any` | Keywords match if any term matches |
 | `--sort FIELD` | Sort, `-FIELD` for descending (default: rank, then catalog order) |
 
@@ -95,6 +96,30 @@ sda-db summary --by platform,split --has-image
 
 Use `values` before filtering on a free-text field. The vocabulary is as written in GEO and not harmonized,
 so `brain` and `Brain` are separate values, and `--tissue brain` matches both.
+
+## Genes: `--gene` and `features`
+
+```bash
+sda-db search --gene GFAP --gene AQP4 --organism human --where "n_vars<=10000"   # targeted panels with both
+sda-db search --gene ERBB2 --gene-any --gene ESR1 --platform Xenium --studies
+sda-db features GSM9448988                       # every feature of one sample, with its type
+sda-db features GSM9448988 --contains CD --format csv
+```
+
+Gene search reads the release's **feature index**, a SQLite file built from every sample's `var` table. It
+is downloaded once, checked against its SHA256, and then queried locally.
+
+- **Measured, not detected.** A gene in the index was measured; it was not necessarily detected.
+- **Whole-transcriptome assays.** Visium and similar assays measure almost every gene, so add
+  `--where "n_vars<=10000"` to find targeted panels (Xenium, CosMx, MERFISH…).
+- **Matching.** Matching ignores case, Ensembl version suffixes and reference-genome prefixes, so `GFAP`
+  also finds mouse `Gfap` and `GRCh38_GFAP`. Matched names, as deposited, are returned per sample as
+  `matched_features`.
+- **Coverage.** Every name of a targeted panel (up to 10,000 features) is searchable, as is every name that
+  appears in two or more panels. A name unique to one whole-transcriptome panel is not searchable.
+- **`features` output.** `sda-db features` lists all features of a targeted panel. For a whole-transcriptome
+  sample it shows the counts by feature type.
+- **Local index.** `--feature-index PATH` or `SDA_DB_FEATURE_INDEX` selects a local index file.
 
 ## show
 

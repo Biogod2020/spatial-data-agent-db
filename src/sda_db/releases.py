@@ -29,6 +29,7 @@ class Release:
     public_repo_id: str | None = None
     public_revision: str | None = None
     rolling: bool = False
+    feature_index: dict[str, str] | None = None
 
     @property
     def short(self) -> str:
@@ -38,7 +39,7 @@ class Release:
         return {"name": self.name, "repo_id": self.repo_id, "revision": self.revision, "tag": self.tag,
                 "sample_count": self.sample_count, "source_release": self.source_release,
                 "public_catalog": (f"{self.public_repo_id}@{self.public_revision}" if self.public_repo_id else None),
-                "rolling": self.rolling, "description": self.description}
+                "rolling": self.rolling, "feature_index": bool(self.feature_index), "description": self.description}
 
 
 @lru_cache(maxsize=1)
@@ -57,7 +58,7 @@ def _from_record(record: dict[str, Any], repo_id: str) -> Release:
                    description=record.get("description", ""), tag=record.get("tag"),
                    sample_count=record.get("sample_count"), source_release=record.get("source_release"),
                    files=dict(record.get("files", {})), public_repo_id=public.get("repo_id"),
-                   public_revision=public.get("revision"))
+                   public_revision=public.get("revision"), feature_index=record.get("feature_index"))
 
 
 def known_releases() -> list[Release]:

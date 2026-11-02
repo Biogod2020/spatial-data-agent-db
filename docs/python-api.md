@@ -33,6 +33,8 @@ All selection methods return a new `Catalog` bound to the same commit, with the 
 | `catalog.search(query=None, *, where=None, min_obs=None, max_obs=None, match="all", sort=None, text=None, **filters)` | Ranked keywords plus filters (AND) |
 | `catalog.select(gsms)` | Rows for the given GSMs, in that order; an unknown ID fails before any work |
 | `catalog.get(gsm)` / `catalog.card(gsm)` | One row / a grouped card (identity, study, biology, assay, expression, coordinates, image, quality, files) |
+| `catalog.search(genes=["GFAP", "AQP4"], gene_match="all")` | Samples whose measured features include the genes (see below) |
+| `catalog.features(gsm)` / `catalog.feature_index()` | Features measured in one sample / the release's `FeatureIndex` |
 | `catalog.head(n)`, `len(catalog)`, `iter(catalog)`, `gsm in catalog`, `catalog.gsms` | Basics |
 
 **Keywords.** `query` is matched against sample fields (tissue, disease, condition, organism and its common
@@ -58,6 +60,16 @@ exact values.
 
 **`where`** takes one expression or a list of them: `"n_obs>=50000"`, `"tissue~cortex"`, `"platform!=Visium"`,
 `"disease="` (missing) and `"split=train|val"`. The operators are `= != ~ !~ > >= < <=`.
+
+**`genes`** uses the release's feature index. The index lists each sample's `var` features (name, source
+ID, type) and is downloaded once, then checked against the SHA256 the release records.
+
+- **Matching.** Symbols and IDs match without regard to case, and Ensembl version suffixes are ignored.
+- **Results.** The matched names appear as `matched_features` in `compact()` rows. A gene no sample measures
+  produces a warning with similar names.
+- **Measured, not detected.** Whole-transcriptome samples measure almost all genes, so add
+  `where="n_vars<=10000"` to find targeted panels.
+- **Local index.** Pass `feature_index=PATH` or set `SDA_DB_FEATURE_INDEX` to use a local index file.
 
 ## Describe and export
 

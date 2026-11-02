@@ -17,6 +17,9 @@ are connected. Python: `import sda_db`.
      `"quoted phrases"`, `-exclude` and `prefix*`.
    - `total` is the full match count. Only `shown` rows are returned.
    - Add `--studies` for one row per study, or `--output cohort.json` to save the full selection.
+   - Add `--gene GFAP --gene AQP4` to keep samples whose panel measures those genes (`--gene-any` for OR).
+     Combine with `--where "n_vars<=10000"` for targeted panels. `sda-db features GSM… --contains X` lists
+     a sample's genes without downloading it.
 2. **Learn the vocabulary instead of guessing:** `sda-db values FIELD [filters]` and `sda-db fields`.
    - Tissue and disease are free GEO text, so prefer `--tissue` and `--disease`, which match substrings.
    - A wrong controlled value (platform, organism, stain, split…) returns exit code 2 with the closest

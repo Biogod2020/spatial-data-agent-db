@@ -32,6 +32,14 @@ rewritten CLI.
   `head()`, `compact()`, `to_pandas()`, `export()` (json/csv/tsv/jsonl/parquet), `from_selection()` and
   `cite()` (BibTeX/text/JSON for the paper, the release and every GEO series).
 
+**Gene search**
+
+- New feature index: the measured `var` features of every sample, with identical panels stored once.
+- `search(genes=..., gene_match=...)`, CLI `--gene`/`--gene-any` and MCP `genes` select samples by the
+  genes or feature IDs they measure.
+- `catalog.features(gsm)`, `sda-db features` and the MCP tool `list_features` list one sample's features
+  without downloading it. A builder for maintainers is in `tools/build_feature_index.py`.
+
 **Downloads**
 
 - `plan_download()` gives bytes per sample and in total (from the release manifest), local reuse and free
@@ -62,7 +70,7 @@ rewritten CLI.
 
 **Agents**
 
-- `sda-db mcp` is a dependency-free MCP stdio server with 12 tools.
+- `sda-db mcp` is a dependency-free MCP stdio server with 13 tools.
   - It negotiates protocol versions and sends server instructions.
   - Downloads are plan-first and capped in size, and they write only to a server-controlled directory.
 - Added an agent skill (`skills/sda-db/SKILL.md`), `AGENTS.md` and `llms.txt`.
@@ -82,7 +90,7 @@ rewritten CLI.
 **Docs and tests**
 
 - New and rewritten docs: CLI reference, agents and MCP, cookbook, Python API.
-- 109 offline tests (64 new), plus a bounded live acceptance script (`tests/live_acceptance.py`).
+- 113 offline tests (68 new), plus a bounded live acceptance script (`tests/live_acceptance.py`).
 - Fixed before release, after an independent code review:
   - negated `-prefix*` and `-"phrase"` terms;
   - queries made only of exclusions;

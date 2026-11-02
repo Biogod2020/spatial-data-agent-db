@@ -5,7 +5,7 @@
 You can work with SpatialDataAgent-DB in three ways:
 
 - **CLI:** `sda-db`. It prints compact JSON when piped.
-- **MCP server:** `sda-db mcp`, with 12 tools.
+- **MCP server:** `sda-db mcp`, with 13 tools.
 - **Python:** `import sda_db`.
 
 Read [`skills/sda-db/SKILL.md`](skills/sda-db/SKILL.md) first. It gives the workflow (search → values/show →

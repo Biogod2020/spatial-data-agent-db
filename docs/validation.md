@@ -5,8 +5,8 @@
 Validated on 2026-11-02 against the paper release `v1.0.0-20261025` (commit
 `999566bf516169ba8c9cf1ad9e5a2b722bb8a97a`) and `latest` (`e1ba100b8e21d5e966c71a478886287647ccb870`).
 
-**Offline tests.** 109 tests passed with socket connections disabled: the 45 tests of 0.2, unchanged in what
-they assert, plus 64 new ones. Twelve of the new tests are regression tests for confirmed findings of an
+**Offline tests.** 113 tests passed with socket connections disabled: the 45 tests of 0.2, unchanged in what
+they assert, plus 68 new ones, four of them for gene search. Twelve of the new tests are regression tests for confirmed findings of an
 independent code review. The new tests cover:
 
 - ranking, phrases, exclusions, prefixes, aliases, operators, typo errors and suggestions;
@@ -33,6 +33,29 @@ release registry and field documentation. `sda-db releases` and an ungated searc
 | `load` and `read_patch` | AnnData 1,142 × 17,943; 64 × 64 × 3 H&E patch centred on the first spot |
 | `sda-db mcp` over stdio | protocol 2025-06-18 negotiated, 12 tools, ranked search (262 matches), a 214.6 GB Xenium download refused with `size_limit` |
 | `latest` | resolved to `e1ba100`; 12,232 samples, including 69 reviewed daily additions |
+
+**Feature index (gene search).**
+
+- **Build.** `tools/build_feature_index.py` read the `var` table of every released `spatial.h5ad` of the paper
+  release. It ran on a compute node and took 707 s.
+  - Before reading, all 12,163 file sizes matched the release file manifest, and 60 randomly chosen files
+    re-hashed to the catalog SHA256. There were 0 problems.
+  - The result is 12,163 samples in 1,954 distinct panels, with 35,045,457 feature rows.
+- **Conversion.** `tools/compact_feature_index.py` wrote the SQLite index (schema `sda-db-feature-index-3`).
+  It is 41.9 MB gzip-compressed and 184 MB unpacked, with SHA256 `c2376d37…2d4`.
+  - 1,703,058 of 4,488,042 search keys are searchable: every key of a targeted panel (up to 10,000
+    features), and every key found in two or more panels.
+- **Speed and memory.** On the login node, gene queries took 0.01–0.07 s, and the process peaked at 0.13 GB.
+  For comparison, a JSON prototype needed 2.6–3.7 GB, so it was replaced.
+- **Results.**
+  - `GFAP` was measured in 8,314 samples from 971 studies. `GFAP` + `AQP4` gave 110 human Xenium samples
+    from 8 studies.
+  - `ENSG00000131095` resolved to the deposited symbol `GFAP`.
+  - An unknown symbol produced a warning.
+- **Correctness.** The stored lists of 25 random targeted panels were identical to their `var` tables
+  (25/25). 200 of 200 random feature names from 10 whole-transcriptome samples were found for their sample.
+- **Status.** The index is not published yet, so the release record holds no index entry. Gene search
+  currently needs `SDA_DB_FEATURE_INDEX` or `feature_index=PATH`.
 
 **Further manual checks.**
 

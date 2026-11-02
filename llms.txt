@@ -6,6 +6,7 @@
 Key facts for agents:
 
 - The CLI prints compact JSON when piped. Errors go to stderr as {"error": {code, message, hint}}, with exit codes 2–8.
+- Gene search: `sda-db search --gene GFAP --where "n_vars<=10000"` finds targeted panels that measure a gene; `sda-db features GSM...` lists a sample's genes.
 - Plan before downloading (`sda-db download ... --dry-run`); the full release is about 1.8 TB.
 - Check expression_state before count-based methods, and coordinate_units / um_basis before using micrometres.
 - Keep the release split and each study together for machine learning.

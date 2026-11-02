@@ -51,12 +51,13 @@ If the app cannot find `sda-db`, give the absolute path from `which sda-db`.
 
 | Tool | What it returns |
 |---|---|
-| `search_samples` | Ranked samples (or studies, with `group_by_study`) for keywords and filters; `total`, compact rows, study titles, warnings |
+| `search_samples` | Ranked samples (or studies, with `group_by_study`) for keywords, filters and `genes`; `total`, compact rows, study titles, warnings |
 | `list_fields` | Every field with its meaning, kind, distinct count and top values, plus the filter syntax |
 | `field_values` | Distinct values of one field with sample/study/observation counts, optionally within a selection |
 | `summarize` | Totals, optionally cross-tabulated by fields |
 | `get_sample` | The full sample card; with `include_sample_json` also its `sample.json` (needs access) |
 | `get_study` | Title, summary, design, PubMed IDs and the samples of a GEO series |
+| `list_features` | Genes/features measured in one sample (from the feature index; no download), filterable by text |
 | `plan_download` | Bytes per sample and in total, local files, free space, whether it fits the limit |
 | `download_samples` | Without `confirm=true`, the plan; with it, a verified download into the server directory |
 | `inspect_sample` | Shape, feature types, columns, coordinate range, QC and image levels of a downloaded sample |

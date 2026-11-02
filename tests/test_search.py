@@ -214,6 +214,50 @@ class SearchTests(unittest.TestCase):
         self.assertIn("1 sample in", records[-1]["note"])
         self.assertIn("GSE10:", self.catalog.select(["GSM1"]).cite(format="text"))
 
+    def test_gene_search_on_the_feature_index(self) -> None:
+        from sda_db import IntegrityError
+
+        import fixtures
+
+        with tempfile.TemporaryDirectory() as folder:
+            index = fixtures.feature_index_file(Path(folder))
+            both = self.catalog.search(genes=["gfap", "AQP4"], feature_index=index)
+            self.assertEqual(both.gsms, ["GSM1", "GSM2"])
+            self.assertEqual(both.compact(5)["samples"][0]["matched_features"], ["GFAP", "AQP4"])
+            self.assertEqual(self.catalog.search(genes="GFAP", feature_index=index).gsms,
+                             ["GSM1", "GSM2", "GSM3", "GSM5"])  # ENSG version and mouse case both match
+            prefixed = self.catalog.search(genes="esr1", feature_index=index)
+            self.assertEqual((prefixed.gsms, prefixed.gene_matches["GSM4"]), (["GSM4"], ["GRCh38_ESR1"]))
+            self.assertEqual(self.catalog.search(genes="G3", feature_index=index).gsms, [])  # unique to one big panel
+            self.assertEqual(self.catalog.search(genes="ENSG00000171885", feature_index=index).gsms, ["GSM1", "GSM2"])
+            self.assertEqual(self.catalog.search(genes="ERBB2 Snap25", gene_match="any", feature_index=index).gsms,
+                             ["GSM3", "GSM4"])
+            combined = self.catalog.search("kidney", genes="gfap", organism="mouse", feature_index=index)
+            self.assertEqual(combined.gsms, ["GSM3"])
+            missing = self.catalog.search(genes="GFA", feature_index=index)
+            self.assertEqual(missing.gsms, [])
+            self.assertTrue(any("similar: GFAP" in w or "similar: Gfap" in w for w in missing.warnings))
+            self.assertEqual(self.catalog.features("GSM4", feature_index=index)["rows"][1]["feature_type"],
+                             "Antibody Capture")
+            whole = self.catalog.features("GSM5", feature_index=index)
+            self.assertEqual((whole["features"], whole["listed"], whole["rows"]), (31, False, None))
+            wrong = fixtures.feature_index_file(Path(folder), catalog_sha256="f" * 64)
+            fresh = fixtures.catalog()
+            fresh.catalog_sha256 = "e" * 64
+            with self.assertRaises(IntegrityError):
+                fresh.search(genes="GFAP", feature_index=wrong)
+        with self.assertRaises(NotFoundError):  # no index recorded for an ad-hoc catalog
+            self.catalog.search(genes="GFAP")
+
+    def test_feature_name_encoding_round_trips(self) -> None:
+        from sda_db.features import _decode_name, _encode_name, feature_keys
+
+        for name, key in [("GFAP", "gfap"), ("Gfap", "gfap"), ("gfap", "gfap"), ("", "x1"), ("^U", "^u"),
+                          ("^weird", "^weird"), ("GRCh38_GFAP", "gfap"), ("A", "a")]:
+            self.assertEqual(_decode_name(_encode_name(name, key), key), name)
+        self.assertEqual(feature_keys("GRCh38_ENSG00000131095.9"),
+                         {"grch38_ensg00000131095.9", "ensg00000131095.9", "ensg00000131095"})
+
     def test_pandas_frame(self) -> None:
         try:
             import pandas  # noqa: F401

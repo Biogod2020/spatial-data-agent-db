@@ -30,6 +30,8 @@ EPILOG = """examples:
   sda-db search alzheimer hippocampus --organism human --has-image
   sda-db search --platform "visium hd" --where "n_obs>=50000" --output cohort.csv
   sda-db values tissue --organism mouse --top 20
+  sda-db search --platform Xenium --gene GFAP --gene AQP4 --organism human
+  sda-db features GSM9448988 --contains CD
   sda-db show GSM3036911 GSE111672
   sda-db download GSM3036911 --dry-run
   sda-db search lung --platform Xenium --format ids | sda-db download --from - --max-size 50GB
@@ -147,6 +149,10 @@ def _filter_options(parser: argparse.ArgumentParser, *, positional_query: bool =
     group.add_argument("--max-obs", type=int, help="at most this many observations")
     group.add_argument("--where", action="append", default=[], metavar="EXPR",
                        help="FIELD=V, FIELD!=V, FIELD~TEXT, FIELD>=N ...; '|' = OR; repeat = AND")
+    group.add_argument("--gene", action="append", metavar="GENE",
+                       help="only samples that measure this gene/feature (symbol or ID, any case); repeat = AND")
+    group.add_argument("--gene-any", action="store_true", help="with several --gene: measuring any of them")
+    group.add_argument("--feature-index", type=Path, help="local feature index file (default: the release's)")
     group.add_argument("--any", action="store_true", help="keywords match if any term matches (default: all)")
     group.add_argument("--text", help="literal substring over all catalog values")
     group.add_argument("--sort", help="sort by FIELD (prefix '-' for descending), e.g. -n_obs")
@@ -236,6 +242,14 @@ def build_parser() -> argparse.ArgumentParser:
     _catalog_options(inspect)
     _output_options(inspect)
 
+    features = commands.add_parser("features", help="genes/features measured in a sample (no download)")
+    features.add_argument("gsm")
+    features.add_argument("--contains", help="only features whose name or ID contains this text")
+    features.add_argument("--limit", type=int, default=50, help="features shown (default 50; 0 = all)")
+    features.add_argument("--feature-index", type=Path, help="local feature index file (default: the release's)")
+    _catalog_options(features)
+    _output_options(features, ("table", "json", "csv", "tsv"))
+
     cite = commands.add_parser("cite", help="citations for the database and the original studies")
     _id_options(cite)
     _filter_options(cite)
@@ -273,7 +287,8 @@ def open_catalog(args: argparse.Namespace, *, release: str | None = None) -> Cat
 
 
 def _filters_given(args: argparse.Namespace) -> bool:
-    keys = ("platform", "organism", "tissue", "disease", "gse", "split", "stain", "min_obs", "max_obs", "text")
+    keys = ("platform", "organism", "tissue", "disease", "gse", "split", "stain", "min_obs", "max_obs", "text",
+            "gene")
     return (any(getattr(args, k, None) for k in keys) or bool(getattr(args, "where", None))
             or getattr(args, "has_image", None) is not None or bool(_query(args)))
 
@@ -301,7 +316,8 @@ def apply_filters(catalog: Catalog, args: argparse.Namespace) -> Catalog:
     return catalog.search(_query(args), where=where, text=getattr(args, "text", None),
                           min_obs=getattr(args, "min_obs", None), max_obs=getattr(args, "max_obs", None),
                           match="any" if getattr(args, "any", False) else "all", sort=getattr(args, "sort", None),
-                          **filters)
+                          genes=getattr(args, "gene", None), gene_match="any" if getattr(args, "gene_any", False)
+                          else "all", feature_index=getattr(args, "feature_index", None), **filters)
 
 
 def _read_ids(source: str) -> tuple[list[str], dict[str, Any] | None]:
@@ -643,6 +659,32 @@ def cmd_inspect(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_features(args: argparse.Namespace) -> int:
+    catalog = open_catalog(args)
+    info = catalog.features(args.gsm, feature_index=args.feature_index)
+    rows = info.pop("rows")
+    note = None
+    if rows is None:
+        note = (f"Whole-transcriptome panel: counts only. Test genes with 'sda-db search --gene G --where "
+                f"gsm={args.gsm}', or read adata.var after 'sda-db download {args.gsm}'.")
+        rows = []
+    if args.contains:
+        needle = args.contains.casefold()
+        rows = [r for r in rows if needle in r["feature_name"].casefold() or needle in r["source_feature_id"].casefold()]
+    shown = rows[: args.limit] if args.limit else rows
+    if _json_mode(args):
+        _emit({**_envelope(catalog), "gsm": args.gsm, **info, "matching": len(rows), "shown": len(shown),
+               "rows": shown, **({"note": note} if note else {})})
+    else:
+        kinds = ", ".join(f"{kind or 'unspecified'} {count:,}" for kind, count in info["feature_types"].items())
+        _note(f"# {args.gsm}: {info['features']:,} features ({kinds})"
+              + (f" · showing {len(shown)} of {len(rows):,}" if rows and len(shown) < len(rows) else ""))
+        if note:
+            _note(f"note: {note}")
+        _print_records(args, shown, ("feature_name", "source_feature_id", "feature_type"))
+    return 0
+
+
 def cmd_cite(args: argparse.Namespace) -> int:
     selection = select_ids(args, require=False)
     text = selection.cite(format=args.style)
@@ -702,7 +744,8 @@ def cmd_mcp(args: argparse.Namespace) -> int:
 
 COMMANDS = {"search": cmd_search, "fields": cmd_fields, "values": cmd_values, "summary": cmd_summary,
             "show": cmd_show, "download": cmd_download, "verify": cmd_verify, "inspect": cmd_inspect,
-            "cite": cmd_cite, "releases": cmd_releases, "doctor": cmd_doctor, "mcp": cmd_mcp}
+            "cite": cmd_cite, "releases": cmd_releases, "doctor": cmd_doctor, "mcp": cmd_mcp,
+            "features": cmd_features}
 
 
 def _configure_logging(verbose: bool, quiet_hub: bool) -> None:
