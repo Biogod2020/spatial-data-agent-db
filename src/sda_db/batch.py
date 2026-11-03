@@ -304,9 +304,11 @@ def download(catalog: Catalog, destination: str | Path = "downloads", *, gsms: I
             if bar is not None:
                 bar.update(1)
     except BaseException:
-        # Ctrl-C or an unexpected error: stop queued samples and let active files abort at their next check.
+        # Ctrl-C or an unexpected error: drop queued samples first, then tell active ones to stop at their
+        # next check, so no queued sample can start in between.
+        pool.shutdown(wait=False, cancel_futures=True)
         cancel.set()
-        pool.shutdown(wait=True, cancel_futures=True)
+        pool.shutdown(wait=True)
         raise
     finally:
         pool.shutdown(wait=True, cancel_futures=True)

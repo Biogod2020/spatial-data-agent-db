@@ -201,23 +201,34 @@ class BatchTests(unittest.TestCase):
             download(self.catalog, self.root / "out", max_bytes="1GB", progress=False)
 
     def test_interrupt_cancels_queued_samples(self) -> None:
-        from threading import Event as ThreadEvent
+        from concurrent.futures import CancelledError as FutureCancelled
 
         from sda_db import batch
 
-        started, release = [], ThreadEvent()
+        started, signals = [], []
+        real_as_completed = batch.as_completed
 
         def slow(catalog, gsm, *args, _cancel=None, **kwargs):
+            if _cancel.is_set():  # as download_sample does before every file
+                raise FutureCancelled("Sample stream closed")
             started.append(gsm)
-            if gsm == "GSM1":
-                raise KeyboardInterrupt
-            release.wait(2)
+            signals.append(_cancel)
+            if gsm != "GSM1":
+                _cancel.wait(5)  # an active transfer that stops at its next check
             return self.root / gsm
 
-        with patch.object(batch, "download_sample", side_effect=slow):
+        def interrupted(futures):  # Ctrl-C arrives in the main thread after the first sample finishes
+            iterator = real_as_completed(futures)
+            yield next(iterator)
+            raise KeyboardInterrupt
+
+        with patch.object(batch, "download_sample", side_effect=slow), \
+                patch.object(batch, "as_completed", side_effect=interrupted):
             with self.assertRaises(KeyboardInterrupt):
                 download(self.catalog, self.root / "out", workers=1, progress=False)
-        self.assertEqual(started, ["GSM1"])  # nothing queued ran after the interrupt
+        self.assertNotIn("GSM3", started)
+        self.assertNotIn("GSM4", started)
+        self.assertTrue(all(signal.is_set() for signal in signals))
 
     def test_parallel_download_keeps_order_and_continues_after_failures(self) -> None:
         self.fail_for = {"GSM3/"}

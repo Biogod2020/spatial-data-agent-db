@@ -155,6 +155,17 @@ class FeatureIndex:
         self.samples: dict[str, int] = dict(self._db.execute("SELECT gsm, panel FROM samples"))
         self._cache: dict[str, dict[int, str]] = {}
 
+    def close(self) -> None:
+        if self._db is not None:
+            self._db.close()
+            self._db = None  # type: ignore[assignment]
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:  # noqa: BLE001 - interpreter shutdown
+            pass
+
     @classmethod
     def from_path(cls, path: str | Path) -> FeatureIndex:
         """Open a .sqlite index, or a .sqlite.gz (decompressed once next to it)."""
