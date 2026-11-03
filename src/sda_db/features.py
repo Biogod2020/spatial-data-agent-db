@@ -239,6 +239,12 @@ def load_feature_index(catalog: Any, path: str | Path | None = None) -> FeatureI
         index = FeatureIndex.from_path(chosen)
     else:
         record = (catalog.release.feature_index if catalog.release is not None else None) or {}
+        borrowed = False
+        if not record and catalog.release is not None and catalog.release.rolling:
+            # A rolling release reuses the paper release's index; newer samples are reported as not indexed.
+            from .releases import default_release
+
+            record, borrowed = default_release().feature_index or {}, True
         if not record:
             raise NotFoundError(f"Release {catalog.release_name} has no published feature index",
                                 hint="Pass a local index (feature_index=PATH or SDA_DB_FEATURE_INDEX), "
@@ -262,6 +268,8 @@ def load_feature_index(catalog: Any, path: str | Path | None = None) -> FeatureI
                 shutil.copyfileobj(source, handle, length=8 << 20)
             Path(handle.name).replace(plain)
         index = FeatureIndex(plain)
+        if borrowed:
+            return index
     if catalog.catalog_sha256 and index.catalog_sha256 and index.catalog_sha256 != catalog.catalog_sha256:
         raise IntegrityError("The feature index was built for a different catalog",
                              hint="Use the index of this release, or open the release the index was built for.")

@@ -54,8 +54,16 @@ release registry and field documentation. `sda-db releases` and an ungated searc
   - An unknown symbol produced a warning.
 - **Correctness.** The stored lists of 25 random targeted panels were identical to their `var` tables
   (25/25). 200 of 200 random feature names from 10 whole-transcriptome samples were found for their sample.
-- **Status.** The index is not published yet, so the release record holds no index entry. Gene search
-  currently needs `SDA_DB_FEATURE_INDEX` or `feature_index=PATH`.
+- **Publication.** The index was published on 2026-11-03 to `Biogod/SpatialDataAgent-DB-Catalog` (commit
+  `080eaea`), with `catalog/feature-index-provenance.json`, and recorded in `releases.json`.
+- **Fresh install test.** A user with no token and an empty cache ran `sda-db search --gene GFAP --gene AQP4
+  --organism human --platform Xenium`. It returned 110 samples in 8 studies, with the 42 MB download taking
+  about 18 s; later queries took about 0.5 s, including process start.
+
+**Live acceptance after gene search.** `tests/live_acceptance.py` now also checks gene search without a
+token. It passed 9 of 9 checks in 19.1 s, including the first index download. `--gene GFAP --gene AQP4
+--platform Xenium` matched 596 samples, with deposited names such as `Gfap`/`Aqp4`, and the MCP session
+listed 13 tools.
 
 **Further manual checks.**
 

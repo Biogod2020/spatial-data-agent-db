@@ -5,7 +5,11 @@
   "releases": [
     {
       "name": "v1.0.0-20261025",
-      "aliases": ["paper", "v1", "v1.0.0"],
+      "aliases": [
+        "paper",
+        "v1",
+        "v1.0.0"
+      ],
       "revision": "999566bf516169ba8c9cf1ad9e5a2b722bb8a97a",
       "tag": "v1.0.0-20261025",
       "source_release": "sda-unified-20261010-v3",
@@ -19,11 +23,19 @@
         "repo_id": "Biogod/SpatialDataAgent-DB-Catalog",
         "revision": "2ae26e037ccbc98e9d0118a5bc1da13f681fbdf8"
       },
-      "description": "Paper release: the frozen 12,163-sample evaluation cohort. Catalog files are byte-identical in the public, ungated catalog repository."
+      "description": "Paper release: the frozen 12,163-sample evaluation cohort. Catalog files are byte-identical in the public, ungated catalog repository.",
+      "feature_index": {
+        "repo_id": "Biogod/SpatialDataAgent-DB-Catalog",
+        "revision": "080eaeac8ac180e77c931c64e4e5e9b8ecfc0de1",
+        "path": "catalog/feature-index.sqlite.gz",
+        "sha256": "c2376d3743932d8d5b2a2c93134efd4b66aa324e653d97e1433a418db645d2a4"
+      }
     },
     {
       "name": "2026-10-29",
-      "aliases": ["sdk-0.2"],
+      "aliases": [
+        "sdk-0.2"
+      ],
       "revision": "8f116b867ce4097957d4209db712d37bae3c9369",
       "source_release": "sda-unified-20261010-v3",
       "sample_count": 12163,
@@ -35,7 +47,9 @@
   ],
   "latest": {
     "name": "latest",
-    "aliases": ["main"],
+    "aliases": [
+      "main"
+    ],
     "ref": "main",
     "description": "Rolling release with reviewed daily additions. Resolved to a full commit when opened; needs approved dataset access."
   }

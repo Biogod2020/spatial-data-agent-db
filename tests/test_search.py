@@ -234,6 +234,11 @@ class SearchTests(unittest.TestCase):
                              ["GSM3", "GSM4"])
             combined = self.catalog.search("kidney", genes="gfap", organism="mouse", feature_index=index)
             self.assertEqual(combined.gsms, ["GSM3"])
+            extra = fixtures.catalog()
+            extra.rows.append(fixtures.row("GSM77", "GSE30"))
+            extra = type(extra)(extra.rows)
+            self.assertTrue(any("not in the feature index" in w
+                                for w in extra.search(genes="GFAP", feature_index=index).warnings))
             missing = self.catalog.search(genes="GFA", feature_index=index)
             self.assertEqual(missing.gsms, [])
             self.assertTrue(any("similar: GFAP" in w or "similar: Gfap" in w for w in missing.warnings))

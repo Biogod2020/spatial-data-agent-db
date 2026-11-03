@@ -175,6 +175,11 @@ original studies as well. The paper:
 > that breadth across studies drives transfer and reproducibility.* bioRxiv (2026).
 > [doi:10.64898/2026.05.27.727615](https://doi.org/10.64898/2026.05.27.727615)
 
+## License
+
+The toolkit code is under the [MIT License](LICENSE). The data keep the terms of the dataset card and of the
+original studies; this license does not cover them.
+
 ## Development
 
 ```bash

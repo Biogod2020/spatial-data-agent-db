@@ -69,6 +69,12 @@ def main() -> None:
     payload = json.loads(out.stdout or "{}")
     check(record, "ungated search without a token", out.returncode == 0 and payload.get("total", 0) > 0,
           {"total": payload.get("total"), "catalog_source": payload.get("catalog_source")})
+    out = subprocess.run([executable, "search", "--gene", "GFAP", "--gene", "AQP4", "--platform", "Xenium", "--json",
+                          "--limit", "1"], capture_output=True, text=True, env={**anonymous,
+                          "SDA_DB_CACHE": str(args.destination / "anonymous-sda")}, timeout=600)
+    payload = json.loads(out.stdout or "{}")
+    check(record, "gene search without a token", out.returncode == 0 and payload.get("total", 0) > 0,
+          {"total": payload.get("total"), "matched": (payload.get("samples") or [{}])[0].get("matched_features")})
     catalog = sda_db.open_catalog()
     check(record, "paper release", (catalog.release_name, len(catalog)) == ("v1.0.0-20261025", 12163),
           {"commit": catalog.revision, "studies": len(catalog.list_studies())})
@@ -91,7 +97,7 @@ def main() -> None:
           {"shape": list(adata.shape), "patch": list(patch.shape)})
     env = {**os.environ, "SDA_DB_DOWNLOAD_DIR": str(args.destination / "mcp")}
     session = mcp_session(executable, env)
-    check(record, "MCP stdio session", session["tools"] == 12 and session["large_download_refused"] == "size_limit",
+    check(record, "MCP stdio session", session["tools"] == 13 and session["large_download_refused"] == "size_limit",
           session)
     latest = sda_db.open_catalog("latest")
     check(record, "latest resolves to a commit", len(latest.revision) == 40 and len(latest) >= len(catalog),

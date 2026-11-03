@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,6 +8,8 @@ version = "0.3.0"
 description = "Search, plan, download, verify, read and cite SpatialDataAgent-DB spatial transcriptomics samples; CLI and MCP server for AI agents"
 readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = ["huggingface_hub>=1.0,<2", "filelock>=3.12,<5"]
 keywords = ["spatial transcriptomics", "spatial omics", "anndata", "visium", "xenium", "atlas", "mcp", "ai agents"]
 classifiers = [

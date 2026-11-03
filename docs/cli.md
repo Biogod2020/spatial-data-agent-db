@@ -107,7 +107,11 @@ sda-db features GSM9448988 --contains CD --format csv
 ```
 
 Gene search reads the release's **feature index**, a SQLite file built from every sample's `var` table. It
-is downloaded once, checked against its SHA256, and then queried locally.
+is downloaded once (42 MB, from the public catalog repository, no login needed), checked against its SHA256,
+and then queried locally.
+
+- **Rolling release.** `--release latest` reuses the paper-release index. Samples added later are reported as
+  not indexed.
 
 - **Measured, not detected.** A gene in the index was measured; it was not necessarily detected.
 - **Whole-transcriptome assays.** Visium and similar assays measure almost every gene, so add

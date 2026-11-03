@@ -438,6 +438,10 @@ class Catalog:
             wanted = [g for item in wanted for g in re.split(r"[,\s]+", str(item)) if g]
             index = self.feature_index(feature_index)
             gene_matches, gene_counts = index.match(wanted, (r["gsm"] for r in selected), mode=gene_match)
+            unindexed = sum(1 for r in selected if r["gsm"] not in index.samples)
+            if unindexed:
+                warnings.append(f"{unindexed} selected samples are not in the feature index (e.g. daily additions "
+                                "after the indexed release) and were left out of the gene filter")
             for gene, count in gene_counts.items():
                 if not index.panels_with(gene):
                     close = index.suggest(gene)

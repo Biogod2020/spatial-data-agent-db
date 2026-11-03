@@ -35,6 +35,8 @@ rewritten CLI.
 **Gene search**
 
 - New feature index: the measured `var` features of every sample, with identical panels stored once.
+  - For the paper release it is published in the public catalog repository (commit `080eaea`, 41.9 MB),
+    so gene search needs no login.
 - `search(genes=..., gene_match=...)`, CLI `--gene`/`--gene-any` and MCP `genes` select samples by the
   genes or feature IDs they measure.
 - `catalog.features(gsm)`, `sda-db features` and the MCP tool `list_features` list one sample's features
@@ -86,6 +88,10 @@ rewritten CLI.
   `ValueError` subclass with suggestions; 0.2 returned an empty selection.
 - The default release moved from `8f116b8` to the paper tag commit `999566b`, so default downloads go to
   `downloads/999566b…/`.
+
+**License**
+
+- The toolkit code is now under the MIT License.
 
 **Docs and tests**
 

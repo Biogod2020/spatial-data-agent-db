@@ -146,6 +146,10 @@ Claude Desktop、Codex、Cursor、Gemini CLI 和 VS Code 的配置方法见 [AI 
 > that breadth across studies drives transfer and reproducibility.* bioRxiv (2026).
 > [doi:10.64898/2026.05.27.727615](https://doi.org/10.64898/2026.05.27.727615)
 
+## 许可证
+
+工具包代码采用 [MIT 许可证](LICENSE)。数据本身仍遵循数据集卡片和各原始研究的条款，不受该许可证约束。
+
 ## 开发
 
 ```bash
