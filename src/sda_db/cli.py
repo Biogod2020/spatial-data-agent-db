@@ -32,6 +32,7 @@ EPILOG = """examples:
   sda-db values tissue --organism mouse --top 20
   sda-db search --platform Xenium --gene GFAP --gene AQP4 --organism human
   sda-db features GSM9448988 --contains CD
+  sda-db starter --has-image                     # 88 samples anyone can download, no login
   sda-db show GSM3036911 GSE111672
   sda-db download GSM3036911 --dry-run
   sda-db search lung --platform Xenium --format ids | sda-db download --from - --max-size 50GB
@@ -187,6 +188,18 @@ def build_parser() -> argparse.ArgumentParser:
                         help="save the complete selection: .json (replayable), .csv, .tsv, .jsonl or .parquet")
     _catalog_options(search)
     _output_options(search, ("table", "json", "jsonl", "csv", "tsv", "ids"))
+
+    starter = commands.add_parser("starter", help="the 88-sample starter pack anyone can download without login",
+                                  description="List or search the starter pack (same options as search). Then e.g. "
+                                              "'sda-db download GSM... --release starter --include-image'.")
+    _filter_options(starter, positional_query=True)
+    starter.add_argument("--limit", type=int, default=None, help="rows shown (default 20 for table/json)")
+    starter.add_argument("--all", action="store_true", help="show every sample")
+    starter.add_argument("--fields", default=None, help="comma-separated fields, 'summary' (default) or 'all'")
+    starter.add_argument("--studies", action="store_true", help="one row per study")
+    starter.add_argument("--output", "-o", type=Path, help="save the selection")
+    _catalog_options(starter)
+    _output_options(starter, ("table", "json", "jsonl", "csv", "tsv", "ids"))
 
     fields = commands.add_parser("fields", help="list searchable fields, their meaning and top values")
     _catalog_options(fields)
@@ -745,7 +758,12 @@ def cmd_mcp(args: argparse.Namespace) -> int:
 COMMANDS = {"search": cmd_search, "fields": cmd_fields, "values": cmd_values, "summary": cmd_summary,
             "show": cmd_show, "download": cmd_download, "verify": cmd_verify, "inspect": cmd_inspect,
             "cite": cmd_cite, "releases": cmd_releases, "doctor": cmd_doctor, "mcp": cmd_mcp,
-            "features": cmd_features}
+            "features": cmd_features, "starter": lambda a: cmd_search(_as_starter(a))}
+
+
+def _as_starter(args: argparse.Namespace) -> argparse.Namespace:
+    args.release = args.release or "starter"
+    return args
 
 
 def _configure_logging(verbose: bool, quiet_hub: bool) -> None:

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.1 — 2026-11-03
+
+- Starter pack: 88 representative samples of the paper release, downloadable without login.
+  - It covers 12 platforms and 20 organ groups, and 60 samples have an image. Files are byte-identical to the
+    gated release and published in the public catalog repository (commit `68b3374`).
+  - Use it with `sda-db starter`, `--release starter` or `open_catalog("starter")`.
+- Releases can now be subsets of a release, bound by a SHA256-checked member list.
+- `examples/starter_pack.ipynb`: a no-login Colab walkthrough covering listing, loading, gene overlay, an H&E
+  patch and gene search.
+
 ## 0.3.0 — 2026-11-02
 
 Agent-ready release: search without an account, ranked keyword search, cohort tooling, an MCP server and a
