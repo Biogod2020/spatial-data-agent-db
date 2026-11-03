@@ -36,6 +36,21 @@ need only the core install. To run the CLI without installing anything:
 uvx --from "git+https://github.com/Biogod2020/spatial-data-agent-db" sda-db search alzheimer
 ```
 
+## Try it without an account: the starter pack
+
+88 representative samples of the paper release can be downloaded **without login**. They cover 12 platforms
+and 20 organ groups, and 60 of them have a tissue image. The files are byte-identical to the gated release.
+[Open the starter notebook in Colab](https://colab.research.google.com/github/Biogod2020/spatial-data-agent-db/blob/main/examples/starter_pack.ipynb).
+
+```bash
+sda-db starter --has-image                          # list the pack
+sda-db download GSM4284327 --release starter --include-image
+```
+
+```python
+adata = sda_db.load("GSM4284327", release="starter", include_image=True)
+```
+
 ## Command line in one minute
 
 ```bash

@@ -84,6 +84,16 @@ The JSON result has this shape:
 - `--output` always saves the complete selection: `.json` is replayable; `.csv`, `.tsv`, `.jsonl` and
   `.parquet` save tables.
 
+## starter
+
+```bash
+sda-db starter                                  # the 88-sample starter pack (no login), same options as search
+sda-db starter --platform Xenium --format ids | sda-db download --from - --release starter
+```
+
+The starter pack is the release `starter`. Its files live in the public catalog repository, so `--release
+starter` also works with `download`, `show`, `values`, `cite` and the Python API, all without login.
+
 ## fields, values, summary
 
 ```bash

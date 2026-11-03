@@ -32,6 +32,16 @@ pip install "spatial-data-agent-db[analysis] @ git+https://github.com/Biogod2020
 uvx --from "git+https://github.com/Biogod2020/spatial-data-agent-db" sda-db search alzheimer
 ```
 
+## 不注册也能试：试用包
+
+论文版本中有 88 个有代表性的样本，**不用登录**就能下载。它们覆盖 12 类平台、20 类器官，其中 60 个带组织图像；
+文件和门控版本逐字节相同。[在 Colab 打开试用 notebook](https://colab.research.google.com/github/Biogod2020/spatial-data-agent-db/blob/main/examples/starter_pack.ipynb)。
+
+```bash
+sda-db starter --has-image
+sda-db download GSM4284327 --release starter --include-image
+```
+
 ## 一分钟上手命令行
 
 ```bash

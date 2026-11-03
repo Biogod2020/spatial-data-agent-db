@@ -215,6 +215,15 @@ class Catalog:
                               local_files_only=offline, cache_dir=cache)
         result.release = rel
         result.source = f"{repo}@{revision}"
+        if rel.subset:  # a named subset of the release, e.g. the no-login starter pack
+            subset_path = fetch(rel.subset["path"])
+            if sha256_file(subset_path) != rel.subset["sha256"]:
+                raise IntegrityError(f"{rel.subset['path']} differs from release {rel.name}")
+            members = json.loads(subset_path.read_text(encoding="utf-8"))["gsms"]
+            rows = [result._by_gsm[g] for g in members]
+            result = cls(rows, result.repo_id, result.revision, result.catalog_sha256, offline, cache)
+            result.release = rel
+            result.source = f"{repo}@{revision}"
         if metadata:
             study_path = fetch(STUDY_METADATA_FILE, optional=True)
             sample_path = fetch(SAMPLE_METADATA_FILE, optional=True)

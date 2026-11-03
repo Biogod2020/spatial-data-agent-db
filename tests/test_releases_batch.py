@@ -82,6 +82,25 @@ class OpenTests(unittest.TestCase):
         self.assertEqual(catalog.get("GSM3")["study_title"], "Mouse kidney injury time course")
         self.assertIsNone(catalog.get("GSM5")["disease"])
 
+    def test_starter_release_is_a_public_subset(self) -> None:
+        starter = resolve_release("starter", offline=True)
+        self.assertEqual(starter.repo_id, PUBLIC)  # files come from the ungated repository
+        self.assertEqual(starter.subset["path"], "starter/starter.json")
+        self.assertEqual(starter.sample_count, 88)
+        subset = self.paths["catalog/samples.csv"].parent / "starter.json"
+        subset.write_text(json.dumps({"schema": "sda-db-starter-1", "gsms": ["GSM3", "GSM1"]}))
+        self.paths["starter/starter.json"] = subset
+        with patch("huggingface_hub.hf_hub_download", side_effect=self.fetch), \
+                patch("sda_db.catalog.resolve_release") as resolver:
+            files = self.hashes()
+            resolver.return_value = type(starter)(**{**starter.__dict__, "files": files,
+                                                     "subset": {"path": "starter/starter.json",
+                                                                "sha256": files["starter/starter.json"]}})
+            catalog = Catalog.open("starter")
+        self.assertEqual(catalog.gsms, ["GSM3", "GSM1"])
+        self.assertEqual(catalog.repo_id, PUBLIC)
+        self.assertEqual(catalog.get("GSM1")["disease"], "Alzheimer's disease")
+
     def test_mirror_bytes_that_differ_from_the_release_are_rejected(self) -> None:
         with patch("huggingface_hub.hf_hub_download", side_effect=self.fetch):
             with self.assertRaises(IntegrityError):
