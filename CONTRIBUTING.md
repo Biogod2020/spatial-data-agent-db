@@ -9,7 +9,10 @@ model credentials and internal management tools. Scientific output definitions
 come from the published `sda-release-sample-1` contract. Schema changes require
 checking their published implementation and updating provenance.
 
-Run `python -m unittest discover -s tests -v` after installing the client and NumPy.
+Run `python -m unittest discover -s tests -v` after installing the client (add `.[analysis]` to include
+the AnnData and image tests). `AGENTS.md` lists the conventions for coding agents and people alike.
+`tests/live_acceptance.py --destination /tmp/sda-live` is the bounded live check (about 10 MB, needs
+approved access); record its result in `docs/validation.md` when behaviour changes.
 Use synthetic fixtures for download/integrity tests; tests must not fetch the
 real dataset or require approval credentials. Live read checks should be explicit,
 bounded, fixed to a commit and recorded separately.

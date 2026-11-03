@@ -9,7 +9,7 @@ individual requested sample fits within the cache budget.
 from sda_db import Catalog, stream_samples
 from sda_db.io import read_sample
 
-catalog = Catalog.from_hub()
+catalog = Catalog.open()          # or sda_db.open_catalog(); `selected.stream(...)` is equivalent
 selected = catalog.search(platform="Visium", organism="Homo sapiens", split="train")
 
 with stream_samples(selected, cache_dir=".sda-cache", max_cache_bytes=10 * 1024**3,

@@ -3,7 +3,7 @@ on: [push, pull_request]
 permissions:
   contents: read
 jobs:
-  test:
+  core:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -13,6 +13,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - run: python -m pip install . numpy
+      - run: python -m pip install .
       - run: python -m unittest discover -s tests -v
-      - run: sda-db --help
+      - run: sda-db --help && sda-db releases --json && sda-db search --help
+  analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install '.[all]'
+      - run: python -m unittest discover -s tests -v

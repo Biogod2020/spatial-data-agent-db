@@ -1,0 +1,56 @@
+{
+  "schema": "sda-db-client-releases-2",
+  "repo_id": "Biogod/SpatialDataAgent-DB",
+  "default": "v1.0.0-20261025",
+  "releases": [
+    {
+      "name": "v1.0.0-20261025",
+      "aliases": [
+        "paper",
+        "v1",
+        "v1.0.0"
+      ],
+      "revision": "999566bf516169ba8c9cf1ad9e5a2b722bb8a97a",
+      "tag": "v1.0.0-20261025",
+      "source_release": "sda-unified-20261010-v3",
+      "sample_count": 12163,
+      "files": {
+        "catalog/samples.csv": "909c4ec50e71c636eadc7bf01a9479fef1b4fd480ac348dfea6b785e566c7bed",
+        "catalog/atlas-sample-metadata.jsonl": "97931a27a014ccd7b31f8a4c36565c0e7a13a122d70c1da63b64db9112738924",
+        "catalog/atlas-study-metadata.jsonl": "4685ed835a24b9a8eb43a14565701fea7e2b146e457466bca9371e7a2c37a6a7"
+      },
+      "public_catalog": {
+        "repo_id": "Biogod/SpatialDataAgent-DB-Catalog",
+        "revision": "2ae26e037ccbc98e9d0118a5bc1da13f681fbdf8"
+      },
+      "description": "Paper release: the frozen 12,163-sample evaluation cohort. Catalog files are byte-identical in the public, ungated catalog repository.",
+      "feature_index": {
+        "repo_id": "Biogod/SpatialDataAgent-DB-Catalog",
+        "revision": "080eaeac8ac180e77c931c64e4e5e9b8ecfc0de1",
+        "path": "catalog/feature-index.sqlite.gz",
+        "sha256": "c2376d3743932d8d5b2a2c93134efd4b66aa324e653d97e1433a418db645d2a4"
+      }
+    },
+    {
+      "name": "2026-10-29",
+      "aliases": [
+        "sdk-0.2"
+      ],
+      "revision": "8f116b867ce4097957d4209db712d37bae3c9369",
+      "source_release": "sda-unified-20261010-v3",
+      "sample_count": 12163,
+      "files": {
+        "catalog/samples.csv": "58085c78174d541d878147912c97ef8d41eaaf87043bbf0c69c2925bbb5ea2cc"
+      },
+      "description": "Default pin of client versions 0.1-0.2. Same samples and files as v1.0.0-20261025, with four empty review columns added."
+    }
+  ],
+  "latest": {
+    "name": "latest",
+    "aliases": [
+      "main"
+    ],
+    "ref": "main",
+    "description": "Rolling release with reviewed daily additions. Resolved to a full commit when opened; needs approved dataset access."
+  }
+}

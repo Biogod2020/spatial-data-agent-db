@@ -1,0 +1,30 @@
+# SpatialDataAgent-DB toolkit
+
+> A Python package, CLI (`sda-db`) and MCP server for SpatialDataAgent-DB. The atlas holds 12,163 public spatial transcriptomics samples from 1,265 GEO studies in the paper release v1.0.0-20261025. Each sample has verified AnnData expression, coordinates and sample.json metadata; 8,211 also have a registered pyramidal tissue image.
+> Searching needs no account. Downloading needs approved Hugging Face access.
+
+Key facts for agents:
+
+- The CLI prints compact JSON when piped. Errors go to stderr as {"error": {code, message, hint}}, with exit codes 2–8.
+- Gene search: `sda-db search --gene GFAP --where "n_vars<=10000"` finds targeted panels that measure a gene; `sda-db features GSM...` lists a sample's genes.
+- Plan before downloading (`sda-db download ... --dry-run`); the full release is about 1.8 TB.
+- Check expression_state before count-based methods, and coordinate_units / um_basis before using micrometres.
+- Keep the release split and each study together for machine learning.
+
+## Docs
+
+- [Agent skill](https://github.com/Biogod2020/spatial-data-agent-db/blob/main/skills/sda-db/SKILL.md): workflow and data pitfalls in one page
+- [README](https://github.com/Biogod2020/spatial-data-agent-db/blob/main/README.md): install, one-minute CLI and Python tours
+- [CLI reference](https://github.com/Biogod2020/spatial-data-agent-db/blob/main/docs/cli.md): commands, selection syntax, JSON envelopes, exit codes
+- [AI agents and MCP](https://github.com/Biogod2020/spatial-data-agent-db/blob/main/docs/agents.md): MCP setup for Claude Code, Codex, Cursor, Gemini CLI, VS Code; tools; safety limits
+- [Python API](https://github.com/Biogod2020/spatial-data-agent-db/blob/main/docs/python-api.md): Catalog, search, plan/download, load, images, errors
+- [Cookbook](https://github.com/Biogod2020/spatial-data-agent-db/blob/main/docs/cookbook.md): cohorts, studies, image patches, streaming, reproducibility
+- [Data dictionary](https://github.com/Biogod2020/spatial-data-agent-db/blob/main/docs/data-dictionary.md): catalog columns, sample files, coordinates and images
+
+## Optional
+
+- [Streaming](https://github.com/Biogod2020/spatial-data-agent-db/blob/main/docs/streaming.md): bounded prefetch and disk-budget cache
+- [Access and troubleshooting](https://github.com/Biogod2020/spatial-data-agent-db/blob/main/docs/access.md)
+- [Reuse and citation](https://github.com/Biogod2020/spatial-data-agent-db/blob/main/docs/reuse.md)
+- [Dataset on Hugging Face](https://huggingface.co/datasets/Biogod/SpatialDataAgent-DB)
+- [Public catalog](https://huggingface.co/datasets/Biogod/SpatialDataAgent-DB-Catalog)

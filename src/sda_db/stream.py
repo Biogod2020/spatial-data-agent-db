@@ -19,6 +19,7 @@ from filelock import FileLock
 
 from .catalog import COMMIT, Catalog
 from .download import _check_row, _read_metadata, download_sample, verify_sample
+from .errors import hub_errors
 
 DEFAULT_CACHE_BYTES = 10 * 1024**3
 MARKER = ".sda-db-cache.json"
@@ -102,8 +103,7 @@ class SampleStream(Iterator[StreamSample]):
             raise ValueError("gsms must be an iterable of GSM identifiers, not a string")
         identifiers = list(dict.fromkeys(gsms if gsms is not None else (r["gsm"] for r in catalog.rows)))
         # Freeze selection/identity before any disk or network work, including typo checks.
-        self.catalog = Catalog([catalog.get(gsm) for gsm in identifiers], catalog.repo_id, catalog.revision,
-                               catalog.catalog_sha256, catalog.local_files_only, catalog.cache_dir)
+        self.catalog = catalog.select(identifiers)
         self._identifiers = identifiers
         self.root = Path(cache_dir).expanduser().resolve()
         self.max_cache_bytes = max_cache_bytes
@@ -220,7 +220,8 @@ class SampleStream(Iterator[StreamSample]):
                 raise CancelledError("Sample stream closed")
             url = hf_hub_url(self.catalog.repo_id, f"{row['sample_dir']}/{name}", repo_type="dataset",
                              revision=self.catalog.revision)
-            info = get_hf_file_metadata(url)
+            with hub_errors():
+                info = get_hf_file_metadata(url)
             if info.commit_hash != self.catalog.revision or type(info.size) is not int or info.size <= 0:
                 raise ValueError(f"Cannot reserve {row['gsm']}/{name}: invalid size or commit")
             sizes[name] = info.size

@@ -1,17 +1,30 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "spatial-data-agent-db"
-version = "0.2.0"
-description = "Search, download and read versioned SpatialDataAgent-DB samples"
+version = "0.3.0"
+description = "Search, plan, download, verify, read and cite SpatialDataAgent-DB spatial transcriptomics samples; CLI and MCP server for AI agents"
 readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = ["huggingface_hub>=1.0,<2", "filelock>=3.12,<5"]
+keywords = ["spatial transcriptomics", "spatial omics", "anndata", "visium", "xenium", "atlas", "mcp", "ai agents"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Operating System :: OS Independent",
+]
 
 [project.optional-dependencies]
-analysis = ["anndata>=0.10,<0.13", "numpy>=1.24,<3", "tifffile>=2024.1"]
+analysis = ["anndata>=0.10,<0.13", "numpy>=1.24,<3", "tifffile>=2024.1", "pandas>=2", "zarr>=2.18"]
+all = ["spatial-data-agent-db[analysis]", "pyarrow>=14"]
 
 [project.scripts]
 sda-db = "sda_db.cli:main"
@@ -19,6 +32,11 @@ sda-db = "sda_db.cli:main"
 [project.urls]
 Repository = "https://github.com/Biogod2020/spatial-data-agent-db"
 Database = "https://huggingface.co/datasets/Biogod/SpatialDataAgent-DB"
+Catalog = "https://huggingface.co/datasets/Biogod/SpatialDataAgent-DB-Catalog"
+Preprint = "https://doi.org/10.64898/2026.05.27.727615"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+sda_db = ["releases.json", "fields.json", "py.typed"]

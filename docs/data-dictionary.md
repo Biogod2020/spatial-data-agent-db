@@ -57,6 +57,32 @@ Organism, tissue and technology labels are not mapped to ontologies by the clien
 | `split` | train / val / test by series |
 | `sample_dir` | samples/<published_gse>/<gsm> |
 
+Releases after the paper release add four review columns:
+
+| Column | Meaning |
+|---|---|
+| `frozen_paper_evaluation_eligible` | `false` for reviewed daily additions, which are not part of the frozen paper evaluation cohort; empty for paper-release samples (decoded to `None`) |
+| `review_kind` | kind of review that admitted a daily addition, e.g. `human` |
+| `review_model`, `review_evidence_sha256` | model and evidence hash of a delegated review, when one was used |
+
+## Atlas metadata joined by the client
+
+`Catalog.open()` joins two release files to every row: `catalog/atlas-study-metadata.jsonl` (per series) and
+`catalog/atlas-sample-metadata.jsonl` (per sample). The values are as reported in GEO. They are not mapped
+to ontologies, and missing values stay `None`.
+
+| Field | Meaning |
+|---|---|
+| `study_title` | GEO series title of `published_gse` (the study's summary, design and PubMed IDs are in `catalog.studies` and `catalog.study(gse)`) |
+| `disease`, `condition` | disease and condition/group labels as reported |
+| `age`, `sex`, `donor_id` | as reported, with original units and spellings (`male`, `M`…) |
+| `publication_pmid`, `publication_doi` | linked publication |
+| `counts_ready` | source-bound counts-capability check: VERIFIED / UNRESOLVED / ABSENT, or NOT_RECORDED for HESRT |
+
+`catalog.card(gsm)` also returns the sample's `counts_evidence` (the deposit text that supports the counts
+call) and its scorer `audit`. Field meanings are available offline through `catalog.fields()` and
+`sda-db fields`.
+
 ## Expression and features
 
 `spatial.h5ad` has a CSR `X`, unique observation/feature indices,

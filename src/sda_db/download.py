@@ -12,6 +12,7 @@ from threading import Event
 from typing import Any
 
 from .catalog import Catalog, SHA256, sha256_file
+from .errors import IntegrityError, hub_errors
 
 LOGGER = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ def _check_row(meta: dict[str, Any], row: dict[str, Any]) -> None:
     if row["has_image"]:
         comparisons.append(((meta.get("image") or {}).get("sha256"), row["image_sha256"]))
     if any(actual != expected for actual, expected in comparisons):
-        raise ValueError(f"sample.json disagrees with catalog for {row['gsm']}")
+        raise IntegrityError(f"sample.json disagrees with catalog for {row['gsm']}")
 
 
 def _safe_target(root: Path, relative: str) -> Path:
@@ -58,19 +59,19 @@ def _install(source: Path, target: Path, expected: str, *, move: bool = False) -
     """Preserve existing user files; install only verified bytes through a temporary file."""
     if target.exists():
         if sha256_file(target) != expected:
-            raise ValueError(f"Existing file has different bytes: {target}; use a new destination")
+            raise IntegrityError(f"Existing file has different bytes: {target}; use a new destination")
         if move and source != target:
             source.unlink(missing_ok=True)
         return
     target.parent.mkdir(parents=True, exist_ok=True)
     if move:
         if sha256_file(source) != expected:
-            raise ValueError(f"SHA256 mismatch: {target.name}")
+            raise IntegrityError(f"SHA256 mismatch: {target.name}")
         try:
             target.hardlink_to(source)
         except FileExistsError:
             if sha256_file(target) != expected:
-                raise ValueError(f"Concurrent conflicting file: {target}")
+                raise IntegrityError(f"Concurrent conflicting file: {target}")
         source.unlink()
         return
     temporary: Path | None = None
@@ -80,13 +81,13 @@ def _install(source: Path, target: Path, expected: str, *, move: bool = False) -
             with source.open("rb") as incoming:
                 shutil.copyfileobj(incoming, handle, length=4 * 1024 * 1024)
         if sha256_file(temporary) != expected:
-            raise ValueError(f"SHA256 mismatch: {target.name}")
+            raise IntegrityError(f"SHA256 mismatch: {target.name}")
         # link() creates the name only if absent, preserving concurrent user writes.
         try:
             target.hardlink_to(temporary)
         except FileExistsError:
             if sha256_file(target) != expected:
-                raise ValueError(f"Concurrent conflicting file: {target}")
+                raise IntegrityError(f"Concurrent conflicting file: {target}")
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
@@ -119,8 +120,9 @@ def download_sample(catalog: Catalog, gsm: str, destination: str | Path = "downl
             staging = _safe_target(root, f"{catalog.revision}/.sda/staging/{gsm}")
             _safe_target(root, f"{catalog.revision}/.sda/staging/{gsm}/{row['sample_dir']}/{filename}")
             options["local_dir"] = staging
-        source = Path(hf_hub_download(catalog.repo_id, f"{row['sample_dir']}/{filename}", repo_type="dataset",
-                                     revision=catalog.revision, **options))
+        with hub_errors():
+            source = Path(hf_hub_download(catalog.repo_id, f"{row['sample_dir']}/{filename}", repo_type="dataset",
+                                         revision=catalog.revision, **options))
         if storage == "direct" and source.resolve() != (staging / row["sample_dir"] / filename).resolve():
             raise ValueError("Hub returned a file outside the direct download staging directory")
         if _cancel is not None and _cancel.is_set():
@@ -138,7 +140,7 @@ def download_sample(catalog: Catalog, gsm: str, destination: str | Path = "downl
                       and metadata_target.is_file())
     if reuse_metadata:
         if sha256_file(metadata_target) != previous.get("files", {}).get("sample.json"):
-            raise ValueError("Local sample.json differs from its recorded receipt")
+            raise IntegrityError("Local sample.json differs from its recorded receipt")
         metadata_source = metadata_target
     else:
         metadata_source = fetch("sample.json")
@@ -155,7 +157,7 @@ def download_sample(catalog: Catalog, gsm: str, destination: str | Path = "downl
         target = _safe_target(root, f"{relative}/{filename}")
         if target.exists():
             if sha256_file(target) != digest:
-                raise ValueError(f"Existing file has different bytes: {target}; use a new destination")
+                raise IntegrityError(f"Existing file has different bytes: {target}; use a new destination")
             LOGGER.info("Reusing verified %s", filename)
         else:
             _install(fetch(filename), target, digest, move=storage == "direct")
@@ -201,7 +203,7 @@ def verify_sample(directory: str | Path, *, require_image: bool = False) -> dict
         if not path.exists() and key == "image" and not require_image:
             continue
         if not path.is_file() or sha256_file(path) != asset["sha256"]:
-            raise ValueError(f"Missing file or SHA256 mismatch: {path.name}")
+            raise IntegrityError(f"Missing file or SHA256 mismatch: {path.name}")
         files[path.name] = asset["sha256"]
     receipt_path = directory.parent.parent.parent / ".sda/receipts" / f"{directory.name}.json"
     receipt = None
@@ -211,8 +213,8 @@ def verify_sample(directory: str | Path, *, require_image: bool = False) -> dict
                 or meta.get("gsm") != directory.name or meta.get("published_gse") != directory.parent.name
                 or receipt.get("revision") != directory.parent.parent.parent.name
                 or receipt.get("sample_dir") != f"samples/{meta.get('published_gse')}/{meta.get('gsm')}"):
-            raise ValueError("Download receipt identity mismatch")
+            raise IntegrityError("Download receipt identity mismatch")
         if any(files.get(name) != digest for name, digest in receipt["files"].items()):
-            raise ValueError("Downloaded files differ from their recorded receipt")
+            raise IntegrityError("Downloaded files differ from their recorded receipt")
     return {"gsm": meta.get("gsm"), "files": files, "revision": receipt["revision"] if receipt else None,
             "receipt_verified": receipt is not None}
