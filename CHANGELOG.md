@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.2 — 2026-11-03
+
+- Starter pack: swapped 5 low-resolution Visium H&E samples (4.7–7.3 µm/px) for 5 at cell resolution
+  (0.73–0.93 µm/px: human lung, colon, endometrium, liver; mouse kidney). Still 88 samples; public commit `ab5017a`.
+
 ## 0.3.1 — 2026-11-03
 
 - Starter pack: 88 representative samples of the paper release, downloadable without login.

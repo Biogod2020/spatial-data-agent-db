@@ -37,22 +37,22 @@
         "starter-pack"
       ],
       "repo_id": "Biogod/SpatialDataAgent-DB-Catalog",
-      "revision": "68b337488c57a174ad8b1658e42097c8ed22237b",
+      "revision": "ab5017a550d5213f2149c23d6ce197d828e330a2",
       "source_release": "sda-unified-20261010-v3",
       "sample_count": 88,
       "files": {
         "catalog/samples.csv": "909c4ec50e71c636eadc7bf01a9479fef1b4fd480ac348dfea6b785e566c7bed",
         "catalog/atlas-sample-metadata.jsonl": "97931a27a014ccd7b31f8a4c36565c0e7a13a122d70c1da63b64db9112738924",
         "catalog/atlas-study-metadata.jsonl": "4685ed835a24b9a8eb43a14565701fea7e2b146e457466bca9371e7a2c37a6a7",
-        "starter/starter.json": "93df9278d91393f1a3df93d48b1cfa3d9aa6d2e7cf4fc29fdcfe089990ad670c"
+        "starter/starter.json": "2b3a29542fa9cfd6b97361315a1975f5c8e8aa6a08f2876eff4871c98b95afe7"
       },
       "public_catalog": {
         "repo_id": "Biogod/SpatialDataAgent-DB-Catalog",
-        "revision": "68b337488c57a174ad8b1658e42097c8ed22237b"
+        "revision": "ab5017a550d5213f2149c23d6ce197d828e330a2"
       },
       "subset": {
         "path": "starter/starter.json",
-        "sha256": "93df9278d91393f1a3df93d48b1cfa3d9aa6d2e7cf4fc29fdcfe089990ad670c"
+        "sha256": "2b3a29542fa9cfd6b97361315a1975f5c8e8aa6a08f2876eff4871c98b95afe7"
       },
       "feature_index": {
         "repo_id": "Biogod/SpatialDataAgent-DB-Catalog",
@@ -60,7 +60,7 @@
         "path": "catalog/feature-index.sqlite.gz",
         "sha256": "c2376d3743932d8d5b2a2c93134efd4b66aa324e653d97e1433a418db645d2a4"
       },
-      "description": "Starter pack: 88 representative samples of the paper release (12 platforms, 20 organ groups, 60 with images), byte-identical to the gated files and downloadable without login."
+      "description": "Starter pack: 88 representative samples of the paper release (12 platforms, 20 organ groups, 60 with images, 8 H&E at cell resolution), byte-identical to the gated files and downloadable without login."
     },
     {
       "name": "2026-10-29",
