@@ -33,6 +33,9 @@ How to use these tools:
 1. search_samples with keywords and filters. Use list_fields and field_values to learn exact vocabularies
    instead of guessing; organism and platform accept common names ('human', 'visium hd').
    Results are ranked; 'total' tells you how many matched beyond the rows returned.
+   The default release adds curated metadata v2: organ, disease (MONDO ID or name), disease_status,
+   sample_kind, life_stage, sex, assay_type, assay_name, preservation, plus min_confidence and exclude_flags
+   to drop uncertain annotations. Release 'paper' is the paper release with its original metadata only.
 2. get_sample / get_study for details (biology, assay, evidence, QC, image registration, publications).
 3. plan_download before download_samples(confirm=true). Images are large and opt-in.
 4. inspect_sample describes a downloaded sample; cite returns BibTeX for the database and original studies.
@@ -49,7 +52,26 @@ _FILTERS: dict[str, Any] = {
                  "'MERFISH/MERSCOPE', Slide-seq, Stereo-seq, 'ST (legacy)'. Common names work. 'A|B' = OR."},
     "organism": {"type": "string", "description": "Organism: scientific or common name ('human', 'mouse'). 'A|B' = OR."},
     "tissue": {"type": "string", "description": "Case-insensitive tissue substring as written in GEO, e.g. 'brain'."},
-    "disease": {"type": "string", "description": "Case-insensitive disease substring as reported in GEO."},
+    "disease": {"type": "string", "description": "Metadata v2 (default release): MONDO ID ('MONDO:0004975') or "
+                "disease name, matched exactly or as a case-insensitive substring of MONDO names (no ancestor "
+                "expansion). Paper release: substring of the disease text reported in GEO. 'A|B' = OR."},
+    "organ": {"type": "string", "description": "Metadata v2 organ from a fixed list of 43 (lung, brain, colon, "
+              "liver, ...). 'A|B' = OR."},
+    "disease_status": {"type": "string", "description": "Metadata v2: normal, disease, perturbation or 'not stated'."},
+    "sample_kind": {"type": "string", "description": "Metadata v2: 'primary tissue', 'tumour tissue', metastasis, "
+                    "organoid, xenograft, 'cell culture', 'whole embryo/organism', 'engineered tissue'."},
+    "life_stage": {"type": "string", "description": "Metadata v2: embryonic, fetal, 'neonatal or infant', juvenile, "
+                   "adult, aged or 'not stated'."},
+    "sex": {"type": "string", "description": "Metadata v2: male, female, mixed or unknown (paper release: as "
+            "reported)."},
+    "assay_type": {"type": "string", "description": "Metadata v2: imaging-based or sequencing-based."},
+    "assay_name": {"type": "string", "description": "Metadata v2 specific assay, e.g. 'Visium CytAssist', "
+                   "'Slide-seqV2', 'Open-ST'."},
+    "preservation": {"type": "string", "description": "Metadata v2: FFPE, 'fresh frozen' or 'fixed frozen'."},
+    "min_confidence": {"type": "number", "description": "Metadata v2: keep samples whose lowest annotation "
+                       "confidence is at least this (0-1); 0.6 drops all low-confidence calls."},
+    "exclude_flags": {"type": "string", "description": "Metadata v2: 'any' drops samples with any metadata flag; "
+                      "or comma-separated flags, e.g. 'normal_but_disease_text,feature_species_differs'."},
     "gse": {"type": "string", "description": "GEO series accession(s); 'A|B' = OR."},
     "gsms": {"type": "string", "description": "Restrict to these GSM accessions (comma or space separated)."},
     "split": {"type": "string", "description": "Release split: train, val or test ('train|val' = OR)."},
@@ -65,7 +87,8 @@ _FILTERS: dict[str, Any] = {
     "gene_match": {"type": "string", "enum": ["all", "any"], "description": "With several genes: all (default) or any."},
     "match": {"type": "string", "enum": ["all", "any"], "description": "Keyword logic (default all)."},
     "sort": {"type": "string", "description": "Sort by field; prefix '-' for descending, e.g. '-n_obs'."},
-    "release": {"type": "string", "description": "Release name, 'latest' or commit (default: paper release)."},
+    "release": {"type": "string", "description": "Release name, 'latest' or commit (default: v1.1.0-20261105 = paper "
+                "data + metadata v2; 'paper' = the paper release as published)."},
 }
 _READ = {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True}
 
@@ -108,27 +131,36 @@ class Server:
             ids = [t for t in str(args["gsms"]).replace(",", " ").split() if t]
             selection = selection.select(ids)
         filters: dict[str, Any] = {}
-        for name in ("platform", "organism", "gse", "split", "image_stain"):
+        curated = bool(catalog.metadata_v2)
+        for name in ("platform", "organism", "gse", "split", "image_stain", "organ", "disease_status", "sample_kind",
+                     "life_stage", "sex", "assay_type", "assay_name", "preservation",
+                     *(("disease",) if curated else ())):
             if args.get(name):
                 values = [v.strip() for v in str(args[name]).split("|") if v.strip()]
                 filters[name] = values if len(values) > 1 else values[0]
         if args.get("has_image") is not None:
             filters["has_image"] = args["has_image"] is True
         where = list(args.get("where") or [])
-        for name in ("tissue", "disease"):
+        for name in ("tissue",) if curated else ("tissue", "disease"):
             if args.get(name):
                 where.append(f"{name}~{args[name]}")
         if filters or where or args.get("query") or args.get("min_obs") is not None or args.get("max_obs") is not None \
-                or args.get("sort") or args.get("genes"):
+                or args.get("sort") or args.get("genes") or args.get("min_confidence") is not None \
+                or args.get("exclude_flags"):
             selection = selection.search(args.get("query"), where=where, min_obs=args.get("min_obs"),
                                          max_obs=args.get("max_obs"), match=args.get("match", "all"),
                                          sort=args.get("sort"), genes=args.get("genes") or None,
-                                         gene_match=args.get("gene_match", "all"), **filters)
+                                         gene_match=args.get("gene_match", "all"),
+                                         min_confidence=args.get("min_confidence"),
+                                         exclude_flags=args.get("exclude_flags") or None, **filters)
         return selection
 
     @staticmethod
     def _envelope(catalog: Catalog) -> dict[str, Any]:
-        return {"release": catalog.release_name, "commit": catalog.revision}
+        envelope = {"release": catalog.release_name, "commit": catalog.revision}
+        if catalog.metadata_v2:
+            envelope["metadata"] = catalog.metadata_v2.get("tag")
+        return envelope
 
     def _register(self) -> None:
         def tool(name: str, title: str, description: str, schema: dict[str, Any],
@@ -334,8 +366,9 @@ class Server:
             return {**self._envelope(selection), "series": len(series), "samples": len(selection),
                     "citations": selection.cite(format=args.get("style", "bibtex"))}
 
-        @tool("list_releases", "List releases", "Database releases this client knows; the default is the paper "
-              "release. 'latest' is the rolling release with daily reviewed additions.", _schema({}))
+        @tool("list_releases", "List releases", "Database releases this client knows; the default is "
+              "v1.1.0-20261105 (paper data + curated metadata v2), 'paper' is the paper release as published, and "
+              "'latest' is the rolling release with daily reviewed additions.", _schema({}))
         def list_releases(args: dict[str, Any]) -> dict[str, Any]:
             from .releases import known_releases, registry
 
@@ -426,7 +459,8 @@ class Server:
         return _error(identifier, -32601, f"Method not found: {method}")
 
 
-_TYPES = {"string": (str,), "integer": (int,), "boolean": (bool,), "array": (list,), "object": (dict,)}
+_TYPES = {"string": (str,), "integer": (int,), "number": (int, float), "boolean": (bool,), "array": (list,),
+          "object": (dict,)}
 
 
 def _validate(schema: dict[str, Any], arguments: dict[str, Any]) -> None:
@@ -439,7 +473,7 @@ def _validate(schema: dict[str, Any], arguments: dict[str, Any]) -> None:
             continue
         spec = schema["properties"][key]
         kinds = _TYPES[spec["type"]]
-        if not isinstance(value, kinds) or (spec["type"] == "integer" and isinstance(value, bool)):
+        if not isinstance(value, kinds) or (spec["type"] in {"integer", "number"} and isinstance(value, bool)):
             raise UnknownValueError(f"Argument {key!r} must be a JSON {spec['type']}, not {type(value).__name__}",
                                     hint="Booleans are true/false and numbers are unquoted.")
         if spec["type"] == "array" and not all(isinstance(v, str) for v in value):

@@ -17,17 +17,24 @@ import shutil
 import sys
 from typing import Any, Iterable, Sequence
 
-from .catalog import DEFAULT_REVISION, SUMMARY_FIELDS, Catalog
+from .catalog import DEFAULT_REVISION, Catalog
 from .download import verify_sample
 from .errors import ACCESS_HINT, AccessError, NotFoundError, SdaDbError, SizeLimitError, translate
 
 LOGGER = logging.getLogger("sda_db")
 TABLE_FIELDS = ("gsm", "published_gse", "platform", "organism", "tissue", "disease", "n_obs", "image_stain",
                 "split", "study_title")
+TABLE_FIELDS_V2 = ("gsm", "published_gse", "platform", "organism", "organ", "sample_kind", "disease_ontology_names",
+                   "n_obs", "image_stain", "split", "study_title")
+V2_OPTIONS = (("organ", "organ"), ("disease_status", "disease_status"), ("sample_kind", "sample_kind"),
+              ("life_stage", "life_stage"), ("sex", "sex"), ("assay_type", "assay_type"), ("assay_name", "assay_name"),
+              ("preservation", "preservation"))
 DEFAULT_GUARD_BYTES = 20 * 10**9
 ID = re.compile(r"(GSM|GSE)[0-9]+\Z")
 EPILOG = """examples:
   sda-db search alzheimer hippocampus --organism human --has-image
+  sda-db search --organ lung --disease fibrosis --platform visium --min-confidence 0.6
+  sda-db search --disease MONDO:0004975 --disease-status disease --exclude-flags
   sda-db search --platform "visium hd" --where "n_obs>=50000" --output cohort.csv
   sda-db values tissue --organism mouse --top 20
   sda-db search --platform Xenium --gene GFAP --gene AQP4 --organism human
@@ -114,7 +121,8 @@ def _note(text: str) -> None:
 def _catalog_options(parser: argparse.ArgumentParser) -> None:
     group = parser.add_argument_group("release")
     group.add_argument("--release", "--revision", dest="release", default=None, metavar="NAME",
-                       help="release name, alias, tag, 'latest' or full commit (default: the paper release)")
+                       help="release name, alias, tag, 'latest' or full commit (default: v1.1.0-20261105, the "
+                            "paper data with curated metadata v2; 'paper' = the paper release as published)")
     group.add_argument("--source", choices=["auto", "public", "gated"], default="auto",
                        help="where catalog files come from; auto uses the ungated mirror when the release has one")
     group.add_argument("--offline", action="store_true", help="use only cached files")
@@ -138,7 +146,9 @@ def _filter_options(parser: argparse.ArgumentParser, *, positional_query: bool =
     group.add_argument("--platform", action="append", help="exact platform (aliases like 'visium hd'); repeat = OR")
     group.add_argument("--organism", action="append", help="organism, scientific or common name; repeat = OR")
     group.add_argument("--tissue", action="append", help="tissue substring, case-insensitive; repeat = OR")
-    group.add_argument("--disease", action="append", help="disease substring, case-insensitive; repeat = OR")
+    group.add_argument("--disease", action="append",
+                       help="metadata v2: MONDO ID or name (case-insensitive substring of names); paper release: "
+                            "substring of the GEO disease text; repeat = OR")
     group.add_argument("--gse", action="append", help="series accession (any membership); repeat = OR")
     group.add_argument("--split", action="append", choices=["train", "val", "test"], help="release split")
     group.add_argument("--stain", action="append", help="exact image stain, e.g. 'H&E' or 'fluorescence: DAPI'")
@@ -146,6 +156,21 @@ def _filter_options(parser: argparse.ArgumentParser, *, positional_query: bool =
     image.add_argument("--has-image", dest="has_image", action="store_true", default=None,
                        help="only samples with a released image")
     image.add_argument("--no-image", dest="has_image", action="store_false", help="only samples without an image")
+    curated = parser.add_argument_group("curated metadata v2 (default release; repeat = OR)")
+    curated.add_argument("--organ", action="append", help="organ from the fixed list, e.g. lung, brain, colon")
+    curated.add_argument("--disease-status", action="append", help="normal, disease, perturbation or 'not stated'")
+    curated.add_argument("--sample-kind", action="append",
+                         help="e.g. 'primary tissue', 'tumour tissue', metastasis, organoid, xenograft")
+    curated.add_argument("--life-stage", action="append",
+                         help="embryonic, fetal, 'neonatal or infant', juvenile, adult, aged, 'not stated'")
+    curated.add_argument("--sex", action="append", help="male, female, mixed or unknown")
+    curated.add_argument("--assay-type", action="append", help="imaging-based or sequencing-based")
+    curated.add_argument("--assay-name", action="append", help="specific assay, e.g. 'Visium CytAssist', Slide-seqV2")
+    curated.add_argument("--preservation", action="append", help="FFPE, 'fresh frozen' or 'fixed frozen'")
+    curated.add_argument("--min-confidence", type=float, metavar="X",
+                         help="lowest annotation confidence at least X (0-1); 0.6 drops low-confidence calls")
+    curated.add_argument("--exclude-flags", nargs="?", const="any", metavar="FLAGS",
+                         help="drop samples with metadata flags: any (no value) or comma-separated flag names")
     group.add_argument("--min-obs", type=int, help="at least this many observations")
     group.add_argument("--max-obs", type=int, help="at most this many observations")
     group.add_argument("--where", action="append", default=[], metavar="EXPR",
@@ -301,8 +326,9 @@ def open_catalog(args: argparse.Namespace, *, release: str | None = None) -> Cat
 
 def _filters_given(args: argparse.Namespace) -> bool:
     keys = ("platform", "organism", "tissue", "disease", "gse", "split", "stain", "min_obs", "max_obs", "text",
-            "gene")
+            "gene", "exclude_flags", *(option for option, _ in V2_OPTIONS))
     return (any(getattr(args, k, None) for k in keys) or bool(getattr(args, "where", None))
+            or getattr(args, "min_confidence", None) is not None
             or getattr(args, "has_image", None) is not None or bool(_query(args)))
 
 
@@ -315,22 +341,25 @@ def _query(args: argparse.Namespace) -> str | None:
 
 def apply_filters(catalog: Catalog, args: argparse.Namespace) -> Catalog:
     filters: dict[str, Any] = {}
+    curated = bool(catalog.metadata_v2)
     for option, name in (("platform", "platform"), ("organism", "organism"), ("gse", "gse"), ("split", "split"),
-                         ("stain", "image_stain")):
+                         ("stain", "image_stain"), *V2_OPTIONS, *((("disease", "disease"),) if curated else ())):
         values = getattr(args, option, None)
         if values:
             filters[name] = values if len(values) > 1 else values[0]
     if getattr(args, "has_image", None) is not None:
         filters["has_image"] = args.has_image
     where = list(getattr(args, "where", []) or [])
-    for option in ("tissue", "disease"):
+    for option in ("tissue",) if curated else ("tissue", "disease"):
         if getattr(args, option, None):
             where.append(f"{option}~" + "|".join(getattr(args, option)))
     return catalog.search(_query(args), where=where, text=getattr(args, "text", None),
                           min_obs=getattr(args, "min_obs", None), max_obs=getattr(args, "max_obs", None),
                           match="any" if getattr(args, "any", False) else "all", sort=getattr(args, "sort", None),
                           genes=getattr(args, "gene", None), gene_match="any" if getattr(args, "gene_any", False)
-                          else "all", feature_index=getattr(args, "feature_index", None), **filters)
+                          else "all", feature_index=getattr(args, "feature_index", None),
+                          min_confidence=getattr(args, "min_confidence", None),
+                          exclude_flags=getattr(args, "exclude_flags", None), **filters)
 
 
 def _read_ids(source: str) -> tuple[list[str], dict[str, Any] | None]:
@@ -380,7 +409,9 @@ def select_ids(args: argparse.Namespace, *, require: bool) -> Catalog:
         ids += more
     release = args.release
     if record and not release:
-        release = record.get("revision")
+        from .releases import recorded_release
+
+        release = recorded_release(record)
     catalog = open_catalog(args, release=release)
     if record and record.get("revision") != catalog.revision:
         _note(f"warning: {args.from_file} was saved at commit {record['revision'][:7]}; "
@@ -407,7 +438,10 @@ def select_ids(args: argparse.Namespace, *, require: bool) -> Catalog:
 
 
 def _envelope(catalog: Catalog) -> dict[str, Any]:
-    return {"release": catalog.release_name, "commit": catalog.revision, "catalog_source": catalog.source}
+    envelope = {"release": catalog.release_name, "commit": catalog.revision, "catalog_source": catalog.source}
+    if catalog.metadata_v2:
+        envelope["metadata"] = catalog.metadata_v2.get("tag")
+    return envelope
 
 
 # --------------------------------------------------------------------------- commands
@@ -462,9 +496,10 @@ def cmd_search(args: argparse.Namespace) -> int:
         _emit(payload)
     else:
         if args.format in {"csv", "tsv", "jsonl", "ids"}:
-            columns = list(records[0].keys()) if records else list(SUMMARY_FIELDS)
+            columns = list(records[0].keys()) if records else list(result.summary_fields)
         else:
-            columns = (list(TABLE_FIELDS) + (["score"] if result.scores is not None else [])
+            columns = (list(TABLE_FIELDS_V2 if result.metadata_v2 else TABLE_FIELDS)
+                       + (["score"] if result.scores is not None else [])
                        if fields == "summary" or not records else list(records[0].keys()))
             _note(f"# {catalog.release_name} ({catalog.revision[:7]}) · {len(result):,} of {len(catalog):,} samples, "
                   f"{len({r['published_gse'] for r in result.rows}):,} studies"

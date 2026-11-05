@@ -10,7 +10,8 @@ picks `table`, `json`, `jsonl`, `csv`, `tsv` or `ids` where offered). Notes and 
 stdout stays machine-readable.
 
 **Releases.** `--release NAME` chooses a release: a name, alias, tag, `latest` or a full commit. The default
-is the paper release `v1.0.0-20261025`. `sda-db releases` lists the choices. Every JSON result names
+is `v1.1.0-20261105`: the paper data (commit `999566b`) plus curated metadata v2. `--release paper` gives the paper
+release `v1.0.0-20261025` exactly as published. `sda-db releases` lists the choices. Every JSON result names
 `release` and `commit`.
 
 **Selection.** `search`, `values`, `summary`, `download` and `cite` share the same filters, and all of them
@@ -21,7 +22,11 @@ must hold (AND):
 | keywords (`search QUERY...`, or `-q/--query` elsewhere) | Ranked; every term must match sample fields or the study title/design/summary. `"phrase"`, `-exclude`, `prefix*`. |
 | `--platform P` | Exact platform; aliases such as `"visium hd"`, `merfish`, `smi`. Repeat for OR. |
 | `--organism O` | Scientific or common name (`human`, `mouse`, `rat`, `zebrafish`...). Repeat for OR. |
-| `--tissue T`, `--disease D` | Case-insensitive substring of the GEO text. Repeat for OR. |
+| `--tissue T` | Case-insensitive substring of the GEO text. Repeat for OR. |
+| `--disease D` | Metadata v2: MONDO ID or name, exact or case-insensitive substring of MONDO names (no parent-term expansion). Paper release: substring of the GEO text. Repeat for OR. |
+| `--organ`, `--disease-status`, `--sample-kind`, `--life-stage`, `--sex`, `--assay-type`, `--assay-name`, `--preservation` | Metadata v2 values (see `sda-db values FIELD`); common words such as `tumor`, `healthy`, `frozen` and `imaging` work. Repeat for OR. |
+| `--min-confidence X` | Metadata v2: lowest annotation confidence at least X (0–1) |
+| `--exclude-flags [FLAGS]` | Metadata v2: drop samples with any `metadata_flags` entry, or only the comma-separated flags given |
 | `--gse GSE…` | Series membership, including secondary series. |
 | `--split train\|val\|test`, `--stain "H&E"`, `--has-image`/`--no-image` | Exact |
 | `--min-obs N`, `--max-obs N` | Observation count bounds (inclusive) |

@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.4.0 — 2026-11-05
+
+Search and filter on curated sample metadata v2; the paper release stays exactly reproducible.
+
+**Releases**
+
+- New default release `v1.1.0-20261105` (aliases `metadata-v2`, `v1.1`). It has the same data commit and files
+  as the paper release (`999566b`), plus the metadata v2 table (`metadata/v2/samples_metadata_v2.csv`, tag
+  `metadata-v2-20261105`). The table is read from the public catalog (`a060371`), or from the gated dataset
+  (`38f35f9`) with `source="gated"`, and checked against its recorded SHA256.
+- `paper` / `v1.0.0-20261025` is unchanged and has the v3 metadata only. A bare commit (`999566b…`) also opens
+  the paper release. Saved selections reopen the release they were saved from.
+
+**Metadata v2**
+
+- Joined by `gsm`: `organ`, UBERON `tissue_ontology_id`/`_name`, `sample_kind`, `disease_status`, MONDO
+  `disease_ontology_ids`/`_names`, `life_stage`, `sex`, `donor_key`, taxonomy (`organism_taxon_id`,
+  `organism_common_name`, `organisms`, `feature_species`), `assay_name`, `assay_type`, `preservation`,
+  `pubmed_ids`, the raw GEO texts, per-field confidence and `metadata_flags`.
+- `platform` (204 corrected samples), `organism`, `sex`, `review_category` and `review_notes` take the v2 value.
+  The v3 value stays in `<name>_v3`. Every other v3 field is kept.
+- `annotation_min_confidence` (client-derived) is the lowest per-field confidence.
+- QA on 300 random samples gave these wrong rates per field: organ 0.3%, tissue term 0.7%, sample kind 0.7%,
+  life stage 1.7% and disease 3.0%. A study-level disease sometimes reaches an unmarked control (about 1.5%).
+
+**Search**
+
+- New filters in `Catalog.search`, the CLI and MCP: `organ`, `disease_status`, `sample_kind`, `life_stage`,
+  `sex`, `assay_type`, `assay_name` and `preservation`. These are controlled values with typo suggestions and
+  common aliases (`tumor`, `healthy`, `frozen`, `imaging`...).
+- `disease` matches a MONDO ID, or a MONDO name exactly or as a case-insensitive substring. Parent terms are
+  not expanded. `where="disease~TEXT"` still searches the GEO text.
+- `organism` matches a scientific name, common name or taxon ID, against every listed host species.
+- `min_confidence` (`--min-confidence`) and `exclude_flags` (`--exclude-flags [FLAGS]`) drop uncertain or
+  flagged annotations.
+- Keyword ranking also indexes organ, UBERON and MONDO names, sample kind, life stage, assay name and type,
+  common name and preservation. The index of the paper release is unchanged.
+- Compact rows and tables show organ, sample kind, disease status, MONDO names and assay name. `card()` has a
+  `curated` section. JSON results and MCP results name the `metadata` tag.
+- `cite()` adds an entry for the metadata v2 tag (commit and table SHA256) and the v2 PubMed IDs.
+
 ## 0.3.2 — 2026-11-03
 
 - Starter pack: swapped 5 low-resolution Visium H&E samples (4.7–7.3 µm/px) for 5 at cell resolution

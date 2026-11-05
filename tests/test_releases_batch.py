@@ -35,8 +35,10 @@ class ReleaseTests(unittest.TestCase):
         default = resolve_release(None, offline=True)
         self.assertEqual(default.revision, DEFAULT_REVISION)
         self.assertEqual(default.public_repo_id, PUBLIC)
-        self.assertEqual(resolve_release("paper").name, default.name)
-        self.assertEqual(resolve_release(default.revision).name, default.name)
+        paper = resolve_release("paper")
+        self.assertEqual((default.name, paper.name), ("v1.1.0-20261105", "v1.0.0-20261025"))
+        self.assertEqual(paper.revision, default.revision)  # metadata v2 adds no data commit
+        self.assertEqual(resolve_release(default.revision).name, paper.name)  # a bare commit is the paper release
         self.assertEqual(resolve_release("sdk-0.2").revision, "8f116b867ce4097957d4209db712d37bae3c9369")
         self.assertEqual(resolve_release("a" * 40).revision, "a" * 40)
         self.assertGreaterEqual(len(known_releases()), 2)
@@ -72,9 +74,9 @@ class OpenTests(unittest.TestCase):
     def test_public_mirror_is_used_and_bound_by_hashes(self) -> None:
         with patch("huggingface_hub.hf_hub_download", side_effect=self.fetch), \
                 patch("sda_db.catalog.resolve_release") as resolver:
-            release = resolve_release(None)
+            release = resolve_release("paper")
             resolver.return_value = type(release)(**{**release.__dict__, "files": self.hashes()})
-            catalog = Catalog.open()
+            catalog = Catalog.open("paper")
         self.assertTrue(all(repo == PUBLIC for repo, _, _ in self.calls))
         self.assertEqual(catalog.repo_id, "Biogod/SpatialDataAgent-DB")  # downloads stay on the gated dataset
         self.assertEqual(catalog.revision, DEFAULT_REVISION)

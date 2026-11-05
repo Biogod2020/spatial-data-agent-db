@@ -1,5 +1,31 @@
 # Client validation
 
+## Version 0.4.0
+
+Validated on 2026-11-05 against `v1.1.0-20261105` (paper commit `999566bf516169ba8c9cf1ad9e5a2b722bb8a97a` plus
+metadata v2, public catalog `a060371ee9d6aaa03faa385d47df81a7384b5f45`, gated tag `metadata-v2-20261105` =
+`38f35f9671155c32a5ce9f654e572efc394ab9f9`), the paper release `v1.0.0-20261025`, and `latest` (`38f35f9`).
+
+**Offline tests.** 136 tests passed with socket connections disabled: the 114 tests of 0.3.2 plus 22 for
+metadata v2. Two 0.3.2 tests were updated because the default release changed: they now check the paper
+release by name. The new tests cover the gsm join (v3 fields kept, `platform_v3`/`organism_v3`/`sex_v3`),
+each new filter and its aliases, `min_confidence` and `exclude_flags`, keyword ranking over v2 fields, facets,
+cards, citations, selections, CLI flags and MCP arguments (still 13 tools), SHA256 mismatches, incomplete or
+inconsistent v2 tables, and the paper release staying free of v2 fields.
+
+**Paper release reproducibility.** Against the live Hub, client 0.3.2 and 0.4.0 give the same `--release paper`
+output: SHA256 of all rows `21293b3b…`, of the ranked result and scores for "human lung fibrosis Visium"
+`dd74575b…`, of `cite()` `438a35ef…` and of `fields()` `65e0df50…`.
+
+**Live acceptance.** `tests/live_acceptance.py` passed 11 of 11 checks in 9.9 s (Python 3.12.13, Hub 1.33.0,
+warm cache). Metadata v2 search without a token ("human lung fibrosis Visium", organ lung, minimum confidence
+0.6) returned 81 samples. The default release reports 204 corrected platforms; downloads, receipts, image
+patches, the MCP session and `latest` passed unchanged.
+
+**Live searches on the default release** (samples / studies): organ lung + disease "fibrosis" 105 / 10;
+`MONDO:0004975` 253 / 23; organism `mouse`, `house mouse` or `10090` 5,053 / 579 (with xenograft hosts);
+`min_confidence=0.6` 9,044; `exclude_flags=True` 8,999.
+
 ## Version 0.3.0
 
 Validated on 2026-11-02 against the paper release `v1.0.0-20261025` (commit

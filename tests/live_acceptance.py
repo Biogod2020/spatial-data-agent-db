@@ -2,7 +2,7 @@
 
     python tests/live_acceptance.py --destination /tmp/sda-live [--skip-download]
 
-Searches the paper release without a token, then (with approved access) plans and downloads two small
+Searches the default release (paper data + metadata v2) and the paper release without a token, then (with approved access) plans and downloads two small
 samples with images (~10 MB), verifies, reads and cuts patches, and drives `sda-db mcp` over stdio.
 Prints one JSON record; exits nonzero on the first failed check. Downloads nothing else.
 """
@@ -75,9 +75,24 @@ def main() -> None:
     payload = json.loads(out.stdout or "{}")
     check(record, "gene search without a token", out.returncode == 0 and payload.get("total", 0) > 0,
           {"total": payload.get("total"), "matched": (payload.get("samples") or [{}])[0].get("matched_features")})
-    catalog = sda_db.open_catalog()
-    check(record, "paper release", (catalog.release_name, len(catalog)) == ("v1.0.0-20261025", 12163),
-          {"commit": catalog.revision, "studies": len(catalog.list_studies())})
+    out = subprocess.run([executable, "search", "human", "lung", "fibrosis", "Visium", "--organ", "lung",
+                          "--min-confidence", "0.6", "--json", "--limit", "1"], capture_output=True, text=True,
+                         env=anonymous, timeout=300)
+    payload = json.loads(out.stdout or "{}")
+    check(record, "metadata v2 search without a token", out.returncode == 0 and payload.get("total", 0) > 0
+          and payload.get("metadata") == "metadata-v2-20261105",
+          {"total": payload.get("total"), "metadata": payload.get("metadata")})
+    curated = sda_db.open_catalog()
+    paper = sda_db.open_catalog("paper")
+    check(record, "default release = paper data + metadata v2",
+          (curated.release_name, len(curated), curated.revision == paper.revision, bool(curated.metadata_v2))
+          == ("v1.1.0-20261105", 12163, True, True),
+          {"commit": curated.revision, "metadata": (curated.metadata_v2 or {}).get("tag"),
+           "platform_changes": sum(1 for r in curated.rows if r["platform"] != r["platform_v3"])})
+    catalog = paper
+    check(record, "paper release unchanged", (paper.release_name, len(paper), paper.metadata_v2,
+                                              "organ" in paper.rows[0]) == ("v1.0.0-20261025", 12163, None, False),
+          {"commit": paper.revision, "studies": len(paper.list_studies())})
     record["release"] = {"name": catalog.release_name, "commit": catalog.revision, "source": catalog.source}
     if args.skip_download:
         print(json.dumps(record, indent=2, default=str))

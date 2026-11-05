@@ -118,9 +118,11 @@ import sda_db
 
 adata = sda_db.load("GSM6963121", release="starter")   # 无需登录；只取表达矩阵，保存到 ./downloads
 
-catalog = sda_db.open_catalog()                  # 论文版本 v1.0.0-20261025；检索无需登录
+catalog = sda_db.open_catalog()                  # v1.1.0-20261105：论文数据 + 元数据 v2；检索无需登录
 hits = catalog.search("alzheimer hippocampus", organism="human", has_image=True)
-print(hits)                                      # <Catalog release=v1.0.0-20261025 commit=999566b samples=... >
+print(hits)                                      # <Catalog release=v1.1.0-20261105 commit=999566b samples=... >
+fibrosis = catalog.search(organ="lung", disease="fibrosis", min_confidence=0.6)   # 整理后的字段（见下文）
+paper = sda_db.open_catalog("paper")             # 与论文完全一致的论文版本
 hits.to_pandas()[["gsm", "tissue", "disease", "n_obs", "score"]]
 hits.list_studies()                              # 每个 GEO 研究一行，含标题和 PubMed ID
 
@@ -217,16 +219,50 @@ claude mcp add sda-db -- uvx --from "git+https://github.com/Biogod2020/spatial-d
 - 没有命中任何样本的检索词会在结果中注明，不会被悄悄丢弃。
 - 论文中研究级的[意图检索](https://github.com/YSTLab/spatial-data-agent)是另一个基于模型的工具。
 
+## 整理后的元数据 v2
+
+默认版本 `v1.1.0-20261105` 就是论文版本（同一提交、同一批文件），外加一张整理后的元数据表
+[metadata v2](https://huggingface.co/datasets/Biogod/SpatialDataAgent-DB-Catalog/tree/main/metadata/v2)
+（标签 `metadata-v2-20261105`），按 GSM 接到每个样本上。新增内容：
+
+- `organ`（固定的 43 个器官）、`tissue_ontology_id`/`_name`（UBERON）和 `sample_kind`（原发组织、肿瘤组织、
+  转移灶、类器官、异种移植等）；
+- `disease_status`（normal / disease / perturbation / not stated）和 `disease_ontology_ids`/`_names`（MONDO）；
+- `life_stage`、统一后的 `sex`、`donor_key`；`organism_taxon_id`、`organism_common_name`、`organisms`；
+- `assay_name`、`assay_type`（基于成像或基于测序）、`preservation` 和 PubMed ID；
+- 204 个样本的 `platform` 经过更正（原发布值保留在 `platform_v3`，同样有 `organism_v3`、`sex_v3`）；
+- 每个字段的置信度、`annotation_low_confidence` 和 `metadata_flags`。
+
+```bash
+sda-db search human lung fibrosis Visium                     # 关键词也会匹配器官、UBERON 和 MONDO 名称
+sda-db search --organ lung --disease fibrosis --min-confidence 0.6
+sda-db search --disease MONDO:0004975 --disease-status disease --exclude-flags
+sda-db values organ --sample-kind "tumour tissue"
+```
+
+`--disease` 接受 MONDO ID 或名称，名称也可以按不区分大小写的子串匹配。不展开上级术语，所以 `--disease cancer`
+找不到 "carcinoma"。`--where "disease~TEXT"` 仍然检索 GEO 中报告的疾病原文。`--organism` 接受学名、俗名或
+分类 ID，样本列出的任何一个宿主物种都算匹配。`--min-confidence 0.6` 去掉所有低置信度的判断；`--exclude-flags`
+去掉带标记的样本，给出标记名则只去掉这些标记。
+
+在 300 个随机样本的质检中，各字段的错误率为：器官 0.3%，组织术语 0.7%，样本类型 0.7%，生命阶段 1.7%，
+疾病 3.0%。已知局限：研究层面的疾病有时会落到一个记录里没有标明为对照的对照样本上（约 1.5% 的样本）。
+对照与疾病的划分很重要时，请查看 `disease_status_source` 和 GEO 原文。
+
+**论文版本仍然可用，没有任何改动：** `--release paper`（或 `v1.0.0-20261025`）只给出 v3 元数据，与论文完全一致。
+用到 v2 时，`sda-db cite` 会写明元数据 v2 的标签。
+
 ## 版本与可复现性
 
 | 版本 | 提交 | 样本数 | 说明 |
 |---|---|---:|---|
-| `v1.0.0-20261025`（默认；别名 `paper`、`v1`） | `999566b` | 12,163 | 论文版本；目录公开并以 SHA256 绑定，文件需要访问权限 |
+| `v1.1.0-20261105`（默认；别名 `metadata-v2`、`v1.1`） | `999566b` | 12,163 | 论文数据和文件，外加整理后的元数据 v2（标签 `metadata-v2-20261105`） |
+| `v1.0.0-20261025`（别名 `paper`、`v1`） | `999566b` | 12,163 | 论文发布时的原样（v3 元数据）；目录公开并以 SHA256 绑定，文件需要访问权限 |
 | `latest` | 打开时解析 | 持续增长 | 每日新增经审核样本的滚动版本；需要访问权限 |
 
 每个样本选择、下载记录和引用都会写明版本名和完整提交号。用 `--release` 或 `open_catalog(release=...)` 选择版本。
-`Catalog.from_selection("cohort.json")` 会按原提交重新打开目录，并选出同一批样本。下载写入
-`downloads/<commit>/samples/<GSE>/<GSM>/`，并附带记录每个文件哈希的凭据。
+`Catalog.from_selection("cohort.json")` 会按原版本和原提交重新打开目录，并选出同一批样本。只给提交号（如 `999566b…`）
+打开的是不带元数据 v2 的论文版本。下载写入 `downloads/<commit>/samples/<GSE>/<GSM>/`，并附带记录每个文件哈希的凭据。
 
 ## 访问权限
 

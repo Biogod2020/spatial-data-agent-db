@@ -17,8 +17,13 @@ extra (anndata, NumPy, pandas, tifffile).
 | `Catalog.from_hub(revision=...)` | Client 0.1–0.2 behaviour: `catalog/samples.csv` from the gated dataset only |
 | `sda_db.known_releases()`, `sda_db.resolve_release(name)` | Release registry; `latest` resolves `main` to a commit once |
 
-- **Release names.** `release` takes a name (`v1.0.0-20261025`, the default), an alias (`paper`, `v1`), a tag,
-  `latest`, or a full commit.
+- **Release names.** `release` takes a name (`v1.1.0-20261105`, the default: paper data plus metadata v2;
+  `v1.0.0-20261025` for the paper release as published), an alias (`metadata-v2`, `paper`, `v1`), a tag,
+  `latest`, or a full commit (a bare commit opens the release without metadata v2).
+- **Metadata v2 filters.** `search(organ=..., disease=..., disease_status=..., sample_kind=..., life_stage=...,
+  sex=..., organism=..., assay_type=..., assay_name=..., preservation=..., min_confidence=..., exclude_flags=...)`.
+  `disease` takes a MONDO ID or name (also as a case-insensitive substring); `organism` a name, common name or
+  taxon ID. `catalog.metadata_v2` holds the tag, path and SHA256; `card(gsm)["curated"]` groups the v2 fields.
 - **Catalog source.** `source="auto"` reads the catalog from the public mirror when the release has one, so
   no account is needed. Each mirrored file must match the SHA256 recorded for the release.
 - **Downloads.** Sample files always come from the gated dataset, at the release commit.

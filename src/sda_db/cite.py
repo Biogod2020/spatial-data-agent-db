@@ -41,7 +41,8 @@ def entries(catalog: Catalog) -> list[dict[str, Any]]:
         "howpublished": f"Hugging Face dataset {catalog.repo_id}",
         "version": catalog.release_name,
         "note": f"Release {catalog.release_name}, commit {catalog.revision}"
-                + (f", tag {release.tag}" if release and release.tag else ""),
+                + (f", tag {release.tag}" if release and release.tag else "")
+                + (f" (data of release {release.data_release})" if release and release.data_release else ""),
         "url": f"https://huggingface.co/datasets/{catalog.repo_id}/tree/{catalog.revision}",
         "year": "2026",
     }
@@ -54,7 +55,25 @@ def entries(catalog: Catalog) -> list[dict[str, Any]]:
                 item["dois"].add(row["publication_doi"])
             if row.get("publication_pmid"):
                 item["pmids"].add(str(row["publication_pmid"]))
+            if gse == row["published_gse"]:  # metadata v2: PubMed IDs of the series and the sample record
+                item["pmids"].update(members("pubmed_ids", row.get("pubmed_ids")))
     result = [dict(PAPER), dataset]
+    metadata = catalog.metadata_v2
+    if metadata:
+        repo = metadata.get("gated_repo_id") or catalog.repo_id
+        commit = metadata.get("gated_revision") or metadata["revision"]
+        folder = metadata["path"].rsplit("/", 1)[0]
+        result.append({
+            "key": f"sdadb_{metadata['tag'].replace('.', '_').replace('-', '_')}",
+            "type": "misc",
+            "title": "SpatialDataAgent-DB curated sample metadata v2",
+            "howpublished": f"Hugging Face dataset {repo}, {folder}",
+            "version": metadata["tag"],
+            "note": f"Metadata {metadata.get('schema')}, tag {metadata['tag']}, commit {commit}; "
+                    f"{metadata['path'].rsplit('/', 1)[1]} SHA256 {metadata['sha256']}",
+            "url": f"https://huggingface.co/datasets/{repo}/tree/{metadata['tag']}/{folder}",
+            "year": "2026",
+        })
     for gse in sorted(series, key=lambda g: int(g[3:])):
         study = catalog.studies.get(gse, {})
         pmids = sorted(set(map(str, study.get("pubmed_ids") or [])) | series[gse]["pmids"])
@@ -105,6 +124,8 @@ def cite(catalog: Catalog, *, format: str = "bibtex") -> str:
     if format != "bibtex":
         raise ValueError("format must be bibtex, text or json")
     header = (f"% Citations for {len(catalog)} samples from SpatialDataAgent-DB release {catalog.release_name} "
-              f"(commit {catalog.revision}).\n% Cite the original studies as well as the database; check each "
+              f"(commit {catalog.revision}"
+              + (f"; metadata {catalog.metadata_v2['tag']}" if catalog.metadata_v2 else "")
+              + f").\n% Cite the original studies as well as the database; check each "
               "study's data-use terms.\n")
     return header + "\n\n".join(_bibtex(r) for r in records) + "\n"
