@@ -223,7 +223,7 @@ claude mcp add sda-db -- uvx --from "git+https://github.com/Biogod2020/spatial-d
 
 默认版本 `v1.1.0-20261105` 就是论文版本（同一提交、同一批文件），外加一张整理后的元数据表
 [metadata v2](https://huggingface.co/datasets/Biogod/SpatialDataAgent-DB-Catalog/tree/main/metadata/v2)
-（标签 `metadata-v2-20261105`），按 GSM 接到每个样本上。新增内容：
+（标签 `metadata-v2.1-20261105`），按 GSM 接到每个样本上。新增内容：
 
 - `organ`（固定的 43 个器官）、`tissue_ontology_id`/`_name`（UBERON）和 `sample_kind`（原发组织、肿瘤组织、
   转移灶、类器官、异种移植等）；
@@ -256,7 +256,7 @@ sda-db values organ --sample-kind "tumour tissue"
 
 | 版本 | 提交 | 样本数 | 说明 |
 |---|---|---:|---|
-| `v1.1.0-20261105`（默认；别名 `metadata-v2`、`v1.1`） | `999566b` | 12,163 | 论文数据和文件，外加整理后的元数据 v2（标签 `metadata-v2-20261105`） |
+| `v1.1.0-20261105`（默认；别名 `metadata-v2`、`v1.1`） | `999566b` | 12,163 | 论文数据和文件，外加整理后的元数据 v2（标签 `metadata-v2.1-20261105`） |
 | `v1.0.0-20261025`（别名 `paper`、`v1`） | `999566b` | 12,163 | 论文发布时的原样（v3 元数据）；目录公开并以 SHA256 绑定，文件需要访问权限 |
 | `latest` | 打开时解析 | 持续增长 | 每日新增经审核样本的滚动版本；需要访问权限 |
 

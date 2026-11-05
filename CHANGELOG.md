@@ -7,9 +7,9 @@ Search and filter on curated sample metadata v2; the paper release stays exactly
 **Releases**
 
 - New default release `v1.1.0-20261105` (aliases `metadata-v2`, `v1.1`). It has the same data commit and files
-  as the paper release (`999566b`), plus the metadata v2 table (`metadata/v2/samples_metadata_v2.csv`, tag
-  `metadata-v2-20261105`). The table is read from the public catalog (`a060371`), or from the gated dataset
-  (`38f35f9`) with `source="gated"`, and checked against its recorded SHA256.
+  as the paper release (`999566b`), plus the metadata v2 table (`metadata/v2/samples_metadata_v2.csv`, version
+  2.1, tag `metadata-v2.1-20261105`, with one `assay_name` per assay). The table is read from the public catalog (`0ddfdbf`), or from the gated dataset
+  (`1c0b636`) with `source="gated"`, and checked against its recorded SHA256.
 - `paper` / `v1.0.0-20261025` is unchanged and has the v3 metadata only. A bare commit (`999566b…`) also opens
   the paper release. Saved selections reopen the release they were saved from.
 

@@ -67,7 +67,7 @@ Releases after the paper release add four review columns:
 
 ## Curated metadata v2 (default release)
 
-Release `v1.1.0-20261105` also joins `metadata/v2/samples_metadata_v2.csv` (tag `metadata-v2-20261105`,
+Release `v1.1.0-20261105` also joins `metadata/v2/samples_metadata_v2.csv` (tag `metadata-v2.1-20261105`,
 schema `sda-sample-metadata-2`, SHA256-checked) by `gsm`. Its columns are defined in
 [`schema_v2.json`](https://huggingface.co/datasets/Biogod/SpatialDataAgent-DB-Catalog/blob/main/metadata/v2/schema_v2.json)
 and listed by `sda-db fields`. Lists are `;`-joined strings, as in the CSV. Where v2 corrects or harmonizes a

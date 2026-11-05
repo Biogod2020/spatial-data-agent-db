@@ -66,7 +66,7 @@ CLI, which prints JSON when piped, or the MCP tools with the same names if they 
 - **Curated metadata v2 is model-made.** In a QA set of 300 random samples, the wrong rate per field was:
   organ 0.3%, tissue term 0.7%, sample kind 0.7%, life stage 1.7% and disease 3.0%. A study-level disease
   sometimes reaches an unmarked control sample (about 1.5%). Check `disease_status_source` and the GEO text
-  when the control/disease split matters, and report `metadata-v2-20261105` with the selection.
+  when the control/disease split matters, and report `metadata-v2.1-20261105` with the selection.
 
 ## Access and errors
 

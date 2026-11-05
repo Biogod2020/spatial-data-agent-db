@@ -235,7 +235,7 @@ Search is deterministic. It runs offline after the first catalog download and ma
 
 The default release `v1.1.0-20261105` is the paper release (same commit, same files) plus a curated metadata
 table, [metadata v2](https://huggingface.co/datasets/Biogod/SpatialDataAgent-DB-Catalog/tree/main/metadata/v2)
-(tag `metadata-v2-20261105`). It is joined to every sample by GSM and adds:
+(tag `metadata-v2.1-20261105`). It is joined to every sample by GSM and adds:
 
 - `organ` (fixed list of 43), `tissue_ontology_id`/`_name` (UBERON) and `sample_kind` (primary tissue, tumour
   tissue, metastasis, organoid, xenograft, ...);
@@ -271,7 +271,7 @@ metadata only, exactly as in the paper. `sda-db cite` names the metadata v2 tag 
 
 | Release | Commit | Samples | Notes |
 |---|---|---:|---|
-| `v1.1.0-20261105` (default; aliases `metadata-v2`, `v1.1`) | `999566b` | 12,163 | Paper data and files plus curated metadata v2 (tag `metadata-v2-20261105`) |
+| `v1.1.0-20261105` (default; aliases `metadata-v2`, `v1.1`) | `999566b` | 12,163 | Paper data and files plus curated metadata v2 (tag `metadata-v2.1-20261105`) |
 | `v1.0.0-20261025` (aliases `paper`, `v1`) | `999566b` | 12,163 | Paper release as published (v3 metadata); its catalog is open and SHA256-bound, its files need access |
 | `latest` | resolved at open | grows | Rolling release with reviewed daily additions; needs access |
 

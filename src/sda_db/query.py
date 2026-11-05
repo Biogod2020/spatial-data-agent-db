@@ -422,7 +422,7 @@ SAMPLE_FIELD_WEIGHTS = {"gsm": 3.0, "gse": 3.0, "tissue": 2.5, "disease": 2.5, "
 V2_INDEXED = frozenset({"organ", "tissue_ontology_name", "disease_ontology_names", "sample_kind", "life_stage",
                         "assay_name", "assay_type", "organism_common_name", "preservation"})
 UNINFORMATIVE = frozenset({"not stated", "unknown", "other", "not named in GEO",
-                           "other (named, not in list)"})  # v2 placeholders, not indexed
+                           "other (named, not in list)", "other (named in GEO, not in list)"})  # v2 placeholders, not indexed
 STUDY_FIELD_WEIGHTS = {"title": 2.0, "design": 1.5, "summary": 1.0}
 K1, B = 1.2, 0.75
 
