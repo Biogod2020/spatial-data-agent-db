@@ -16,7 +16,8 @@ from typing import Any, Iterable, Iterator, Sequence
 
 from .errors import IntegrityError, NotFoundError, UnknownFieldError, UnknownValueError, hub_errors
 from .query import (BOOLEAN_FIELDS as QUERY_BOOLEANS, CONTROLLED_FIELDS, LIST_SEPARATORS, NUMERIC_FIELDS,
-                    Condition, TextIndex, Vocabulary, compile_condition, condition_from_kwarg, members,
+                    V2_CONTROLLED_FIELDS, V2_VALUE_ALIASES, VALUE_ALIASES, Condition, TextIndex, Vocabulary,
+                    compile_condition, condition_from_kwarg, disease_term_predicate, members, organism_predicate,
                     parse_where)
 from .releases import COMMIT, Release, registry, resolve_release
 
@@ -43,6 +44,24 @@ SUMMARY_FIELDS = ("gsm", "published_gse", "platform", "organism", "tissue", "dis
                   "observation_unit", "has_image", "image_stain", "expression_state", "coordinate_units",
                   "split", "study_title")
 GEO_URL = "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc={}"
+# Curated sample metadata v2 (sda-sample-metadata-2), joined by gsm for releases that record it.
+METADATA_V2_SCHEMA = "sda-sample-metadata-2"
+METADATA_V2_FIELDS = (
+    "organ", "organ_source", "tissue_ontology_id", "tissue_ontology_name", "tissue_raw", "sample_kind",
+    "disease_status", "disease_status_source", "disease_ontology_ids", "disease_ontology_names", "disease_raw",
+    "condition_raw", "life_stage", "life_stage_source", "life_stage_luna", "age_raw", "sex_raw", "donor_key",
+    "donor_id_raw", "organism_taxon_id", "organism_common_name", "organisms", "organism_taxon_ids",
+    "co_detected_organisms", "xenograft", "multi_species", "organism_basis", "organism_raw", "feature_species",
+    "preservation", "preservation_raw", "platform_basis", "assay_name", "assay_type", "technology_raw",
+    "panel_name", "instrument_software", "pubmed_ids", "dois", "annotation_version", "annotation_confidence",
+    "annotation_low_confidence", "metadata_flags")
+# v2 corrects or harmonizes these v3 columns: the v2 value takes the name, the v3 value stays as <name>_v3.
+METADATA_V2_OVERRIDES = ("platform", "organism", "sex", "review_category", "review_notes")
+METADATA_V2_BOOLEANS = frozenset({"xenograft", "multi_species"})
+# v2 fields that exist only with metadata v2; used for clearer errors on releases without it.
+METADATA_V2_ONLY = frozenset(METADATA_V2_FIELDS) | {"annotation_min_confidence"} | {
+    f"{name}_v3" for name in METADATA_V2_OVERRIDES}
+V2_SUMMARY_FIELDS = ("organ", "sample_kind", "disease_status", "disease_ontology_names", "assay_name")
 
 
 def sha256_file(path: Path) -> str:
@@ -54,10 +73,10 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-@lru_cache(maxsize=1)
-def field_docs() -> dict[str, str]:
+@lru_cache(maxsize=2)
+def field_docs(metadata_v2: bool = False) -> dict[str, str]:
     value = json.loads(resources.files("sda_db").joinpath("fields.json").read_text(encoding="utf-8"))
-    return {**value["catalog"], **value["metadata"]}
+    return {**value["catalog"], **value["metadata"], **(value["metadata_v2"] if metadata_v2 else {})}
 
 
 def validate_row(row: dict[str, Any]) -> None:
@@ -113,6 +132,33 @@ def _text(value: Any) -> str | None:
     return value if isinstance(value, str) else json.dumps(value) if isinstance(value, (list, dict)) else str(value)
 
 
+def read_metadata_v2(path: Path) -> list[dict[str, Any]]:
+    """Rows of samples_metadata_v2.csv: lists stay ';'-joined strings, booleans decode, empty is None."""
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        wanted = {"gsm", "published_gse", *METADATA_V2_FIELDS, *METADATA_V2_OVERRIDES}
+        if missing := wanted - set(reader.fieldnames or []):
+            raise IntegrityError(f"{path.name} lacks metadata v2 columns: {sorted(missing)}")
+        records = []
+        for number, raw in enumerate(reader, 2):
+            record: dict[str, Any] = {k: (raw[k] if raw[k] != "" else None) for k in wanted}
+            for key in METADATA_V2_BOOLEANS:
+                if record[key] is not None:
+                    if record[key] not in {"True", "False"}:
+                        raise IntegrityError(f"{path.name} line {number}: {key} is not True/False")
+                    record[key] = record[key] == "True"
+            confidence = None
+            if record["annotation_confidence"]:
+                try:
+                    scores = json.loads(record["annotation_confidence"])
+                    confidence = min(float(v) for v in scores.values() if v is not None) if scores else None
+                except (ValueError, TypeError, AttributeError) as exc:
+                    raise IntegrityError(f"{path.name} line {number}: invalid annotation_confidence") from exc
+            record["annotation_min_confidence"] = confidence
+            records.append(record)
+    return records
+
+
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     records = []
     with path.open(encoding="utf-8") as handle:
@@ -148,6 +194,7 @@ class Catalog:
     warnings: list[str] = field(default_factory=list, repr=False)
     report: dict[str, Any] | None = field(default=None, repr=False)
     gene_matches: dict[str, list[str]] | None = field(default=None, repr=False)
+    metadata_v2: dict[str, Any] | None = field(default=None, repr=False)
     _shared: dict[str, Any] | None = field(default=None, repr=False)
     _by_gsm: dict[str, dict[str, Any]] = field(init=False, repr=False)
 
@@ -184,13 +231,14 @@ class Catalog:
         repo, revision = (rel.public_repo_id, rel.public_revision) if public else (rel.repo_id, rel.revision)
         cache = Path(cache_dir).expanduser() if cache_dir is not None else None
 
-        def fetch(filename: str, optional: bool = False) -> Path | None:
+        def fetch(filename: str, optional: bool = False, location: tuple[str, str] | None = None) -> Path | None:
             from huggingface_hub import hf_hub_download
             from huggingface_hub.errors import EntryNotFoundError, LocalEntryNotFoundError
 
+            where_repo, where_revision = location or (repo, revision)
             with hub_errors():
                 try:
-                    path = Path(hf_hub_download(repo, filename, repo_type="dataset", revision=revision,
+                    path = Path(hf_hub_download(where_repo, filename, repo_type="dataset", revision=where_revision,
                                                 local_files_only=offline, cache_dir=cache))
                 except LocalEntryNotFoundError:
                     if optional and offline:
@@ -200,6 +248,8 @@ class Catalog:
                     if optional:
                         return None
                     raise
+            if location is not None:
+                return path  # the caller checks the hash recorded for this file
             expected = rel.files.get(filename)
             if public and not expected:
                 raise IntegrityError(f"Release {rel.name} records no SHA256 for mirrored {filename}",
@@ -230,6 +280,18 @@ class Catalog:
             if study_path or sample_path:
                 result._attach_metadata(_read_jsonl(study_path) if study_path else None,
                                         _read_jsonl(sample_path) if sample_path else None)
+            if rel.metadata:
+                info = rel.metadata
+                location = ((info["repo_id"], info["revision"]) if source in {"auto", "public"}
+                            else (info.get("gated_repo_id", rel.repo_id), info.get("gated_revision", rel.revision)))
+                v2_path = fetch(info["path"], location=location)
+                assert v2_path is not None
+                if sha256_file(v2_path) != info["sha256"]:
+                    raise IntegrityError(f"{info['path']} from {location[0]}@{location[1][:7]} differs from the "
+                                         f"metadata recorded for release {rel.name}",
+                                         hint="Clear the cached file and retry, or use --release paper "
+                                              "(v3 metadata only); report the release name if it persists.")
+                result._attach_metadata_v2(read_metadata_v2(v2_path), info)
         return result
 
     @classmethod
@@ -264,7 +326,9 @@ class Catalog:
         record = json.loads(Path(path).read_text(encoding="utf-8"))
         if record.get("schema") not in {"sda-db-selection-1", "sda-db-selection-2"}:
             raise ValueError("Unsupported selection file")
-        catalog = cls.open(record["revision"], repo_id=record.get("repo_id"), **open_options)
+        from .releases import recorded_release
+
+        catalog = cls.open(recorded_release(record), repo_id=record.get("repo_id"), **open_options)
         if record.get("catalog_sha256") and catalog.catalog_sha256 != record["catalog_sha256"]:
             raise IntegrityError("Catalog bytes differ from the selection record")
         return catalog.select(row["gsm"] for row in record["samples"])
@@ -283,11 +347,36 @@ class Catalog:
                 row[key] = _text(record.get(key))
         self._shared = {"rows": self.rows}
 
+    def _attach_metadata_v2(self, records: list[dict[str, Any]], info: dict[str, Any]) -> None:
+        """Join curated metadata v2 by gsm; v3 values of corrected columns are kept as <name>_v3."""
+        by_gsm: dict[str, dict[str, Any]] = {}
+        for record in records:
+            if record["gsm"] in by_gsm:
+                raise IntegrityError(f"Metadata v2 lists {record['gsm']} twice")
+            by_gsm[record["gsm"]] = record
+        missing = [row["gsm"] for row in self.rows if row["gsm"] not in by_gsm]
+        if missing:
+            raise IntegrityError(f"Metadata v2 lacks {len(missing)} samples of this catalog, e.g. {missing[0]}",
+                                 hint="Use --release paper for the v3 metadata alone.")
+        for row in self.rows:
+            record = by_gsm[row["gsm"]]
+            if record["published_gse"] != row["published_gse"]:
+                raise IntegrityError(f"Metadata v2 places {row['gsm']} in {record['published_gse']}, "
+                                     f"the catalog in {row['published_gse']}")
+            for name in METADATA_V2_OVERRIDES:
+                row[f"{name}_v3"] = row.get(name) if row.get(name) != "" else None
+                row[name] = record[name]
+            for name in METADATA_V2_FIELDS:
+                row[name] = record[name]
+            row["annotation_min_confidence"] = record["annotation_min_confidence"]
+        self.metadata_v2 = dict(info)
+        self._shared = {"rows": self.rows}
+
     # ---------------------------------------------------------------- basics
     def _derive(self, rows: list[dict[str, Any]], **changes: Any) -> Catalog:
         derived = Catalog(rows, self.repo_id, self.revision, self.catalog_sha256, self.local_files_only,
                           self.cache_dir, self.studies, self.release, self.sample_records, self.source,
-                          _shared=self._shared, **changes)
+                          metadata_v2=self.metadata_v2, _shared=self._shared, **changes)
         return derived
 
     def __len__(self) -> int:
@@ -307,15 +396,23 @@ class Catalog:
     def _repr_html_(self) -> str:
         from html import escape
 
-        head = "".join(f"<th>{escape(f)}</th>" for f in SUMMARY_FIELDS)
+        head = "".join(f"<th>{escape(f)}</th>" for f in self.summary_fields)
         body = "".join("<tr>" + "".join(f"<td>{escape(str(r.get(f, '') if r.get(f) is not None else ''))}</td>"
-                                        for f in SUMMARY_FIELDS) + "</tr>" for r in self.rows[:20])
+                                        for f in self.summary_fields) + "</tr>" for r in self.rows[:20])
         more = f"<p>… {len(self.rows) - 20} more rows</p>" if len(self.rows) > 20 else ""
         return f"<p>{escape(repr(self))}</p><table><tr>{head}</tr>{body}</table>{more}"
 
     @property
     def release_name(self) -> str:
         return self.release.name if self.release else self.revision[:7]
+
+    @property
+    def summary_fields(self) -> tuple[str, ...]:
+        """Compact columns: SUMMARY_FIELDS, plus organ/sample kind/disease/assay with metadata v2."""
+        if not self.metadata_v2:
+            return SUMMARY_FIELDS
+        cut = SUMMARY_FIELDS.index("disease")
+        return SUMMARY_FIELDS[:cut] + V2_SUMMARY_FIELDS + SUMMARY_FIELDS[cut + 1:]
 
     @property
     def gsms(self) -> list[str]:
@@ -360,7 +457,12 @@ class Catalog:
     # ---------------------------------------------------------------- search
     def _vocabulary(self) -> Vocabulary:
         if "vocabulary" not in self._shared:
-            self._shared["vocabulary"] = Vocabulary(self._shared["rows"], self.field_names)
+            if self.metadata_v2:
+                self._shared["vocabulary"] = Vocabulary(self._shared["rows"], self.field_names,
+                                                        controlled=CONTROLLED_FIELDS | V2_CONTROLLED_FIELDS,
+                                                        aliases={**VALUE_ALIASES, **V2_VALUE_ALIASES})
+            else:
+                self._shared["vocabulary"] = Vocabulary(self._shared["rows"], self.field_names)
         return self._shared["vocabulary"]
 
     def _index(self) -> TextIndex:
@@ -391,7 +493,9 @@ class Catalog:
     def search(self, query: str | None = None, *, where: str | Sequence[str] | None = None,
                text: str | None = None, min_obs: int | None = None, max_obs: int | None = None,
                match: str = "all", sort: str | None = None, genes: str | Sequence[str] | None = None,
-               gene_match: str = "all", feature_index: str | Path | None = None, **filters: Any) -> Catalog:
+               gene_match: str = "all", feature_index: str | Path | None = None,
+               min_confidence: float | None = None, exclude_flags: bool | str | Sequence[str] | None = None,
+               **filters: Any) -> Catalog:
         """Select samples by ranked keywords and structured filters (all ANDed).
 
         - ``query``: keywords over sample fields (tissue, disease, organism, platform, IDs)
@@ -409,6 +513,21 @@ class Catalog:
           symbols or IDs, case-insensitively, from the release's feature index. Measured is not detected,
           and whole-transcriptome assays measure almost every gene.
 
+        With curated metadata v2 (the default release; not the paper release):
+
+        - ``organ``, ``disease_status``, ``sample_kind``, ``life_stage``, ``sex``, ``assay_type``,
+          ``assay_name``, ``preservation`` filter the harmonized values (``catalog.values(field)`` lists them;
+          common words such as 'tumor', 'healthy', 'frozen' or 'imaging' work).
+        - ``disease``: a MONDO ID ('MONDO:0005184') or a MONDO name, exactly or as a case-insensitive
+          substring ('fibrosis'); ancestor terms are not expanded. ``where='disease~TEXT'`` still searches
+          the disease text as reported in GEO.
+        - ``organism``: scientific name, NCBI common name, taxon ID or 'human'/'mouse'; any listed host
+          species matches.
+        - ``min_confidence``: keep samples whose lowest annotation confidence (organ, sample kind, disease
+          status, UBERON term, life stage) is at least this value (0-1; 0.6 drops every low-confidence call).
+        - ``exclude_flags``: True drops every sample with a ``metadata_flags`` entry; a flag name or list
+          drops only those (e.g. 'normal_but_disease_text', 'feature_species_differs').
+
         This is deterministic metadata search; it makes no model calls.
         """
         if match not in {"all", "any"}:
@@ -416,7 +535,18 @@ class Catalog:
         vocabulary = self._vocabulary()
         warnings: list[str] = []
         conditions: list[Condition] = []
+        special: list[tuple[Condition, Any]] = []
         for key, value in filters.items():
+            if self.metadata_v2 and key in {"disease", "organism"}:
+                values = tuple(value) if isinstance(value, (list, tuple, set, frozenset)) else (value,)
+                build = disease_term_predicate if key == "disease" else organism_predicate
+                special.append((Condition(key, "=", values), build(values, vocabulary, warnings)))
+                continue
+            if key not in vocabulary.fields and key in METADATA_V2_ONLY:
+                raise UnknownFieldError(f"{key!r} comes with curated metadata v2, which release "
+                                        f"{self.release_name} does not include",
+                                        hint="Open the default release (v1.1.0-20261105, alias metadata-v2); "
+                                             "the paper release keeps its original v3 metadata.")
             if key not in vocabulary.fields:
                 close = difflib.get_close_matches(key, vocabulary.fields, n=1, cutoff=0.6)
                 raise UnknownFieldError(f"Unsupported filters: {key!r}",
@@ -429,6 +559,23 @@ class Catalog:
         if isinstance(where, str):
             where = [where]
         conditions.extend(parse_where(expression) for expression in (where or []))
+        if (min_confidence is not None or exclude_flags not in (None, False)) and not self.metadata_v2:
+            raise UnknownFieldError(f"min_confidence and exclude_flags need curated metadata v2, which release "
+                                    f"{self.release_name} does not include",
+                                    hint="Open the default release (v1.1.0-20261105, alias metadata-v2).")
+        if min_confidence is not None:
+            if isinstance(min_confidence, bool) or not isinstance(min_confidence, (int, float)) \
+                    or not 0 <= min_confidence <= 1:
+                raise UnknownValueError("min_confidence must be a number from 0 to 1", hint="Example: 0.6")
+            conditions.append(Condition("annotation_min_confidence", ">=", (float(min_confidence),)))
+        if exclude_flags is True or (isinstance(exclude_flags, str) and exclude_flags.strip().casefold()
+                                     in {"any", "all", "true"}):
+            conditions.append(Condition("metadata_flags", "=", ("",)))
+        elif exclude_flags not in (None, False):
+            flags = re.split(r"[,\s]+", exclude_flags) if isinstance(exclude_flags, str) else list(exclude_flags)
+            flags = [f for f in flags if f]
+            if flags:
+                conditions.append(Condition("metadata_flags", "!=", tuple(flags)))
         if min_obs is not None and max_obs is not None and min_obs > max_obs:
             raise ValueError("min_obs must be <= max_obs")
         if min_obs is not None:
@@ -436,6 +583,8 @@ class Catalog:
         if max_obs is not None:
             conditions.append(Condition("n_obs", "<=", (max_obs,)))
         predicates = [compile_condition(c, vocabulary, warnings) for c in conditions]
+        predicates += [predicate for _, predicate in special]
+        conditions = [condition for condition, _ in special] + conditions
         selected = [row for row in self.rows if all(p(row) for p in predicates)]
         if text:
             needle = text.casefold()
@@ -494,7 +643,7 @@ class Catalog:
         if sort:
             selected = _sorted(selected, sort, vocabulary)
         report["total"] = len(selected)
-        if not selected and (filters or where or query or genes):
+        if not selected and (filters or where or query or genes or min_confidence is not None or exclude_flags):
             warnings.append("No samples matched. Relax a filter, use FIELD~TEXT substrings, "
                             "or inspect values with 'sda-db values FIELD'.")
         return self._derive([dict(r) for r in selected], scores=scores, warnings=warnings, report=report,
@@ -503,7 +652,7 @@ class Catalog:
     # ---------------------------------------------------------------- describing
     def fields(self) -> list[dict[str, Any]]:
         """Every searchable field with its meaning, kind, distinct count and top values."""
-        docs = field_docs()
+        docs = field_docs(bool(self.metadata_v2))
         vocabulary = self._vocabulary()
         result = []
         for name in self.field_names:
@@ -511,9 +660,10 @@ class Catalog:
             kind = ("boolean" if name in BOOLEAN_FIELDS | QUERY_BOOLEANS else "number" if name in NUMERIC_FIELDS
                     else "id" if name in {"gsm", "published_gse", "sample_dir", "expression_sha256", "image_sha256",
                                           "content_group", "review_evidence_sha256", "publication_pmid",
-                                          "publication_doi", "donor_id"}
-                    else "list" if name in LIST_SEPARATORS and name not in CONTROLLED_FIELDS
-                    else "category" if name in CONTROLLED_FIELDS else "text")
+                                          "publication_doi", "donor_id", "donor_key", "organism_taxon_id",
+                                          "tissue_ontology_id"}
+                    else "list" if name in LIST_SEPARATORS and name not in vocabulary.controlled
+                    else "category" if name in vocabulary.controlled else "text")
             missing = sum(1 for r in self._shared["rows"] if r.get(name) in (None, ""))
             entry = {"field": name, "kind": kind, "description": docs.get(name, ""), "distinct": len(counter),
                      "missing": missing}
@@ -612,7 +762,7 @@ class Catalog:
                 "summary": meta.get("summary"), "design": meta.get("design"), "geo_url": GEO_URL.format(gse),
                 "member_studies": [{"published_gse": s["published_gse"], "title": s["title"], "samples": s["samples"]}
                                    for s in aggregate] if len(aggregate) > 1 else None,
-                "samples_detail": [{k: r.get(k) for k in SUMMARY_FIELDS if k != "study_title"} for r in rows]}
+                "samples_detail": [{k: r.get(k) for k in self.summary_fields if k != "study_title"} for r in rows]}
 
     def card(self, gsm: str) -> dict[str, Any]:
         """Everything the catalog knows about one sample, grouped for reading."""
@@ -635,6 +785,7 @@ class Catalog:
             "quality": pick("flags", "qc_flags", "review_decision", "review_category", "review_notes",
                             "review_kind", "frozen_paper_evaluation_eligible"),
             "split": row["split"],
+            **({"curated": self._curated(row)} if self.metadata_v2 else {}),
             "provenance": pick("source_pipeline", "source_release"),
             "publication": pick("publication_pmid", "publication_doi"),
             "files": {"sample.json": f"{row['sample_dir']}/sample.json",
@@ -644,13 +795,40 @@ class Catalog:
                       "image_sha256": row["image_sha256"] or None},
         }
 
+    def _curated(self, row: dict[str, Any]) -> dict[str, Any]:
+        """Metadata v2 of one sample, grouped; the release's own (v3) values stay in the other sections."""
+        pick = lambda *keys: {k: row.get(k) for k in keys}  # noqa: E731
+        listed = lambda key: members(key, row.get(key))  # noqa: E731
+        confidence = row.get("annotation_confidence")
+        info = self.metadata_v2 or {}
+        return {
+            "metadata": f"{info.get('schema', METADATA_V2_SCHEMA)} ({info.get('tag')})",
+            "tissue": {**pick("organ", "organ_source", "tissue_ontology_id", "tissue_ontology_name", "sample_kind")},
+            "disease": {"disease_status": row.get("disease_status"),
+                        "disease_status_source": row.get("disease_status_source"),
+                        "disease_ontology_ids": listed("disease_ontology_ids"),
+                        "disease_ontology_names": listed("disease_ontology_names")},
+            "donor": pick("life_stage", "life_stage_source", "sex", "donor_key"),
+            "species": {**pick("organism", "organism_taxon_id", "organism_common_name", "feature_species",
+                               "xenograft", "multi_species"),
+                        "organisms": listed("organisms"), "co_detected_organisms": listed("co_detected_organisms")},
+            "assay": pick("platform", "platform_v3", "platform_basis", "assay_name", "assay_type", "preservation",
+                          "panel_name"),
+            "publications": {"pubmed_ids": listed("pubmed_ids"), "dois": listed("dois")},
+            "annotation": {"annotation_version": row.get("annotation_version"),
+                           "confidence": json.loads(confidence) if confidence else None,
+                           "min_confidence": row.get("annotation_min_confidence"),
+                           "low_confidence": listed("annotation_low_confidence"),
+                           "metadata_flags": listed("metadata_flags")},
+        }
+
     # ---------------------------------------------------------------- export
     def to_records(self, fields: Sequence[str] | str | None = None) -> list[dict[str, Any]]:
         """Rows as dictionaries; fields=None/'all' keeps every column, 'summary' the compact set."""
         if fields in (None, "all"):
             chosen = None
         elif fields == "summary":
-            chosen = list(SUMMARY_FIELDS)
+            chosen = list(self.summary_fields)
         else:
             chosen = [fields] if isinstance(fields, str) else list(fields)
             for name in chosen:
@@ -668,7 +846,7 @@ class Catalog:
         """Token-lean rows for agents: summary fields without empty values; study titles once."""
         samples, studies = [], {}
         for row in self.rows[:limit]:
-            record = {k: row.get(k) for k in SUMMARY_FIELDS if k != "study_title" and row.get(k) not in (None, "")}
+            record = {k: row.get(k) for k in self.summary_fields if k != "study_title" and row.get(k) not in (None, "")}
             if self.scores is not None:
                 record["score"] = self.scores.get(row["gsm"])
             if self.gene_matches is not None:
@@ -719,6 +897,8 @@ class Catalog:
             "schema": "sda-db-selection-2", "repo_id": self.repo_id, "revision": self.revision,
             "release": self.release_name, "catalog_sha256": self.catalog_sha256, "client_version": __version__,
             "query": (self.report or {}).get("query"), "filters": (self.report or {}).get("filters"),
+            **({"metadata": {k: self.metadata_v2.get(k) for k in ("schema", "tag", "path", "sha256")}}
+               if self.metadata_v2 else {}),
             "samples": self.rows}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     # ---------------------------------------------------------------- actions

@@ -122,9 +122,11 @@ import sda_db
 
 adata = sda_db.load("GSM6963121", release="starter")   # no login; expression only, saved to ./downloads
 
-catalog = sda_db.open_catalog()                  # paper release v1.0.0-20261025; searching needs no login
+catalog = sda_db.open_catalog()                  # v1.1.0-20261105: paper data + metadata v2; no login
 hits = catalog.search("alzheimer hippocampus", organism="human", has_image=True)
-print(hits)                                      # <Catalog release=v1.0.0-20261025 commit=999566b samples=... >
+print(hits)                                      # <Catalog release=v1.1.0-20261105 commit=999566b samples=... >
+fibrosis = catalog.search(organ="lung", disease="fibrosis", min_confidence=0.6)   # curated fields (below)
+paper = sda_db.open_catalog("paper")             # the paper release exactly as published
 hits.to_pandas()[["gsm", "tissue", "disease", "n_obs", "score"]]
 hits.list_studies()                              # one row per GEO series, with titles and PubMed IDs
 
@@ -229,16 +231,53 @@ Search is deterministic. It runs offline after the first catalog download and ma
 - The study-level [intent search](https://github.com/YSTLab/spatial-data-agent) of the paper is a separate,
   model-based tool.
 
+## Curated metadata v2
+
+The default release `v1.1.0-20261105` is the paper release (same commit, same files) plus a curated metadata
+table, [metadata v2](https://huggingface.co/datasets/Biogod/SpatialDataAgent-DB-Catalog/tree/main/metadata/v2)
+(tag `metadata-v2.1-20261105`). It is joined to every sample by GSM and adds:
+
+- `organ` (fixed list of 43), `tissue_ontology_id`/`_name` (UBERON) and `sample_kind` (primary tissue, tumour
+  tissue, metastasis, organoid, xenograft, ...);
+- `disease_status` (normal / disease / perturbation / not stated) and `disease_ontology_ids`/`_names` (MONDO);
+- `life_stage`, harmonized `sex`, `donor_key`; `organism_taxon_id`, `organism_common_name`, `organisms`;
+- `assay_name`, `assay_type` (imaging- or sequencing-based), `preservation` and PubMed IDs;
+- a corrected `platform` for 204 samples (the release value stays in `platform_v3`, likewise `organism_v3`,
+  `sex_v3`);
+- per-field confidence, `annotation_low_confidence` and `metadata_flags`.
+
+```bash
+sda-db search human lung fibrosis Visium                     # keywords also match organ, UBERON and MONDO names
+sda-db search --organ lung --disease fibrosis --min-confidence 0.6
+sda-db search --disease MONDO:0004975 --disease-status disease --exclude-flags
+sda-db values organ --sample-kind "tumour tissue"
+```
+
+`--disease` takes a MONDO ID or name; names also match as case-insensitive substrings. Parent terms are not
+expanded, so `--disease cancer` does not find "carcinoma". `--where "disease~TEXT"` still searches the disease
+text reported in GEO. `--organism` accepts a scientific name, a common name or a taxon ID, and matches every host
+species listed for a sample. `--min-confidence 0.6` removes all low-confidence calls. `--exclude-flags` removes
+flagged samples; pass flag names to remove only those flags.
+
+In a QA set of 300 random samples, the wrong rate per field was: organ 0.3%, tissue term 0.7%, sample
+kind 0.7%, life stage 1.7% and disease 3.0%. Known limitation: a study-level disease sometimes reaches a control
+sample that its own record does not mark as a control (about 1.5% of samples). Check `disease_status_source` and
+the GEO text when the control/disease split matters.
+
+**The paper release is still available unchanged:** `--release paper` (or `v1.0.0-20261025`) gives the v3
+metadata only, exactly as in the paper. `sda-db cite` names the metadata v2 tag whenever v2 is used.
+
 ## Releases and reproducibility
 
 | Release | Commit | Samples | Notes |
 |---|---|---:|---|
-| `v1.0.0-20261025` (default; aliases `paper`, `v1`) | `999566b` | 12,163 | Paper release; its catalog is open and SHA256-bound, its files need access |
+| `v1.1.0-20261105` (default; aliases `metadata-v2`, `v1.1`) | `999566b` | 12,163 | Paper data and files plus curated metadata v2 (tag `metadata-v2.1-20261105`) |
+| `v1.0.0-20261025` (aliases `paper`, `v1`) | `999566b` | 12,163 | Paper release as published (v3 metadata); its catalog is open and SHA256-bound, its files need access |
 | `latest` | resolved at open | grows | Rolling release with reviewed daily additions; needs access |
 
 Every selection, download and citation records its release name and full commit. Use `--release` or
-`open_catalog(release=...)` to choose one. `Catalog.from_selection("cohort.json")` reopens the same commit and
-the same samples. Downloads go to `downloads/<commit>/samples/<GSE>/<GSM>/` with a receipt of every file hash.
+`open_catalog(release=...)` to choose one. `Catalog.from_selection("cohort.json")` reopens the same release,
+commit and samples. A bare commit such as `999566b…` opens the paper release without metadata v2. Downloads go to `downloads/<commit>/samples/<GSE>/<GSM>/` with a receipt of every file hash.
 
 ## Access
 

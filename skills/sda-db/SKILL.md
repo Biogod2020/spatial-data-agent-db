@@ -5,9 +5,12 @@ description: Find, download and read public spatial transcriptomics samples (Vis
 
 # SpatialDataAgent-DB
 
-The paper release `v1.0.0-20261025` holds 12,163 samples from 1,265 GEO studies, and 8,211 of them have a
-tissue image. Use the `sda-db` CLI, which prints JSON when piped, or the MCP tools with the same names if they
-are connected. Python: `import sda_db`.
+The atlas holds 12,163 samples from 1,265 GEO studies, and 8,211 of them have a tissue image. The default
+release `v1.1.0-20261105` is the paper data plus curated metadata v2 (organ, UBERON tissue, MONDO disease,
+disease status, sample kind, life stage, sex, taxonomy, assay, preservation). `--release paper`
+(`v1.0.0-20261025`) is the paper release exactly as published, with its original metadata only. Use the `sda-db`
+CLI, which prints JSON when piped, or the MCP tools with the same names if they are connected. Python:
+`import sda_db`.
 
 ## Workflow
 
@@ -17,11 +20,17 @@ are connected. Python: `import sda_db`.
      `"quoted phrases"`, `-exclude` and `prefix*`.
    - `total` is the full match count. Only `shown` rows are returned.
    - Add `--studies` for one row per study, or `--output cohort.json` to save the full selection.
+   - Curated filters (default release): `--organ lung`, `--disease fibrosis` or `--disease MONDO:0004975`
+     (MONDO name substring or ID; parent terms are not expanded), `--disease-status normal|disease|perturbation`,
+     `--sample-kind "tumour tissue"`, `--life-stage aged`, `--sex female`, `--assay-type imaging-based`,
+     `--assay-name "Visium CytAssist"`, `--preservation FFPE`. `--organism` accepts a name, common name or taxon ID.
+   - Drop uncertain annotations with `--min-confidence 0.6` and `--exclude-flags`.
    - Add `--gene GFAP --gene AQP4` to keep samples whose panel measures those genes (`--gene-any` for OR).
      Combine with `--where "n_vars<=10000"` for targeted panels. `sda-db features GSM… --contains X` lists
      a sample's genes without downloading it.
 2. **Learn the vocabulary instead of guessing:** `sda-db values FIELD [filters]` and `sda-db fields`.
-   - Tissue and disease are free GEO text, so prefer `--tissue` and `--disease`, which match substrings.
+   - `tissue` and the v3 `disease` field are free GEO text: `--tissue` and `--where "disease~TEXT"` match
+     substrings. Prefer `--organ` and `--disease` (curated) on the default release.
    - A wrong controlled value (platform, organism, stain, split…) returns exit code 2 with the closest
      values in `hint`. Retry with one of them.
 3. **Inspect:** `sda-db show GSM…` (sample card) or `sda-db show GSE…` (study with all its samples).
@@ -52,8 +61,12 @@ are connected. Python: `import sda_db`.
   Never split observations of one section at random.
 - **Evidence.** Verification, image registration and human review are separate fields. An empty
   `review_decision` is not a PASS.
-- **Organisms.** Organism values are written as in GEO. A few samples list two species (for example a
-  xenograft); `--organism mouse` matches any member.
+- **Organisms.** A few samples list two species (for example a xenograft); `--organism mouse` matches any
+  listed host. `feature_species` gives the species implied by the gene IDs.
+- **Curated metadata v2 is model-made.** In a QA set of 300 random samples, the wrong rate per field was:
+  organ 0.3%, tissue term 0.7%, sample kind 0.7%, life stage 1.7% and disease 3.0%. A study-level disease
+  sometimes reaches an unmarked control sample (about 1.5%). Check `disease_status_source` and the GEO text
+  when the control/disease split matters, and report `metadata-v2.1-20261105` with the selection.
 
 ## Access and errors
 
@@ -74,7 +87,8 @@ are connected. Python: `import sda_db`.
   | 8 | disk full |
 
   The JSON error on stderr has `code`, `message` and `hint`.
-- **Releases.** The default is the frozen paper release. `--release latest` adds reviewed daily samples and
-  needs access.
+- **Releases.** The default `v1.1.0-20261105` has the same data commit as the frozen paper release plus
+  metadata v2. `--release paper` reproduces the paper exactly. `--release latest` adds reviewed daily samples
+  (without metadata v2) and needs access.
 
 Full docs: https://github.com/Biogod2020/spatial-data-agent-db (docs/cli.md, docs/agents.md, docs/cookbook.md).

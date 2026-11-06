@@ -66,7 +66,11 @@ If the app cannot find `sda-db`, give the absolute path from `which sda-db`.
 | `check_access` | The `doctor` checks: token, login, dataset access, public catalog, disk |
 
 The selection filters are the same as in the CLI. Alternatives inside one argument are joined with `|`, as
-in `platform: "Visium|Visium HD"`. Every result names its `release` and `commit`.
+in `platform: "Visium|Visium HD"`. Every result names its `release` and `commit`, and `metadata` when curated
+metadata v2 is used. On the default release the filters include `organ`, `disease` (MONDO ID or name),
+`disease_status`, `sample_kind`, `life_stage`, `sex`, `assay_type`, `assay_name`, `preservation`,
+`min_confidence` (number, 0–1) and `exclude_flags` (`"any"` or flag names). Pass `release: "paper"` for the
+paper release exactly as published.
 
 ## Safety limits
 

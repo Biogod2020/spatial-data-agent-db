@@ -13,15 +13,25 @@ from .errors import UnknownFieldError, UnknownValueError
 
 # Fields whose catalog value holds several members.
 LIST_SEPARATORS = {"gse": "+", "flags": ";", "qc_flags": ";", "drop_features": ";", "aliases": ";",
-                   "organism": "\n;"}
-NUMERIC_FIELDS = frozenset({"n_obs", "n_vars", "um_per_unit", "image_um_per_px"})
-BOOLEAN_FIELDS = frozenset({"has_image", "has_spatial_um", "frozen_paper_evaluation_eligible"})
+                   "organism": "\n;",
+                   # metadata v2 list columns (joined with ';' in samples_metadata_v2.csv)
+                   "organisms": ";", "organism_taxon_ids": ";", "co_detected_organisms": ";",
+                   "disease_ontology_ids": ";", "disease_ontology_names": ";", "pubmed_ids": ";", "dois": ";",
+                   "annotation_low_confidence": ";", "metadata_flags": ";"}
+NUMERIC_FIELDS = frozenset({"n_obs", "n_vars", "um_per_unit", "image_um_per_px", "annotation_min_confidence"})
+BOOLEAN_FIELDS = frozenset({"has_image", "has_spatial_um", "frozen_paper_evaluation_eligible", "xenograft",
+                            "multi_species"})
 # Small, release-defined vocabularies: an unknown value is an error with suggestions.
 CONTROLLED_FIELDS = frozenset({
     "platform", "organism", "source_pipeline", "observation_unit", "expression_state", "verification",
     "coordinate_units", "um_basis", "image_stain", "image_stain_basis", "image_registration", "segmentation",
     "molecules", "molecules_use", "review_decision", "group_kind", "split", "counts_ready", "review_kind",
     "flags", "qc_flags"}) | BOOLEAN_FIELDS
+# Controlled only when a release carries metadata v2 (in v3, 'sex' is free text as reported).
+V2_CONTROLLED_FIELDS = frozenset({
+    "organ", "organ_source", "sample_kind", "disease_status", "disease_status_source", "life_stage", "sex",
+    "preservation", "assay_type", "assay_name", "annotation_version", "annotation_low_confidence", "metadata_flags",
+    "organism_common_name", "feature_species", "platform_basis"})
 
 # Common names map to the scientific names that GEO records. Applied only when present.
 ORGANISM_NAMES = {
@@ -46,7 +56,28 @@ PLATFORM_NAMES = {
 }
 STAIN_NAMES = {"he": "H&E", "hne": "H&E", "h and e": "H&E", "hematoxylin and eosin": "H&E",
                "dapi": "fluorescence: DAPI"}
+SAMPLE_KIND_NAMES = {"tumour": "tumour tissue", "tumor": "tumour tissue", "tumor tissue": "tumour tissue",
+                     "cancer": "tumour tissue", "primary": "primary tissue", "pdx": "xenograft",
+                     "embryo": "whole embryo/organism", "whole embryo": "whole embryo/organism",
+                     "whole organism": "whole embryo/organism", "cell line": "cell culture", "culture": "cell culture",
+                     "metastatic": "metastasis"}
+DISEASE_STATUS_NAMES = {"healthy": "normal", "control": "normal", "diseased": "disease", "unknown": "not stated",
+                        "treated": "perturbation", "intervention": "perturbation"}
+LIFE_STAGE_NAMES = {"infant": "neonatal or infant", "neonatal": "neonatal or infant", "neonate": "neonatal or infant",
+                    "newborn": "neonatal or infant", "elderly": "aged", "old": "aged", "embryo": "embryonic",
+                    "fetus": "fetal", "foetal": "fetal", "unknown": "not stated"}
+SEX_NAMES = {"m": "male", "f": "female", "men": "male", "women": "female"}
+PRESERVATION_NAMES = {"frozen": "fresh frozen", "fresh-frozen": "fresh frozen", "oct": "fresh frozen",
+                      "paraffin": "FFPE", "formalin-fixed paraffin-embedded": "FFPE", "fixed-frozen": "fixed frozen"}
+ASSAY_TYPE_NAMES = {"imaging": "imaging-based", "sequencing": "sequencing-based", "image-based": "imaging-based"}
+ORGAN_NAMES = {"mammary": "breast", "mammary gland": "breast", "muscle": "skeletal muscle", "marrow": "bone marrow",
+               "nerve": "peripheral nerve", "artery": "blood vessel", "aorta": "blood vessel", "embryo": "embryo (whole)",
+               "large intestine": "colon"}
 VALUE_ALIASES = {"organism": ORGANISM_NAMES, "platform": PLATFORM_NAMES, "image_stain": STAIN_NAMES}
+# Used only for releases with metadata v2, so paper-release filters behave exactly as before.
+V2_VALUE_ALIASES = {"sample_kind": SAMPLE_KIND_NAMES, "disease_status": DISEASE_STATUS_NAMES,
+                    "life_stage": LIFE_STAGE_NAMES, "sex": SEX_NAMES, "preservation": PRESERVATION_NAMES,
+                    "assay_type": ASSAY_TYPE_NAMES, "organ": ORGAN_NAMES}
 COMMON_WORDS = {
     "Homo sapiens": "human", "Mus musculus": "mouse mice murine", "Rattus norvegicus": "rat",
     "Macaca fascicularis": "macaque cynomolgus monkey primate", "Macaca mulatta": "macaque rhesus monkey primate",
@@ -171,10 +202,19 @@ def condition_from_kwarg(field: str, value: Any) -> Condition:
 class Vocabulary:
     """Distinct values per field, for validation, aliases and suggestions."""
 
-    def __init__(self, rows: Sequence[dict[str, Any]], fields: Iterable[str]) -> None:
+    def __init__(self, rows: Sequence[dict[str, Any]], fields: Iterable[str], *,
+                 controlled: frozenset[str] = CONTROLLED_FIELDS,
+                 aliases: dict[str, dict[str, str]] | None = None) -> None:
         self.fields = list(fields)
         self._values: dict[str, Counter[str]] = {}
         self._rows = rows
+        self.controlled = controlled
+        self.aliases = VALUE_ALIASES if aliases is None else aliases
+        self.cache: dict[str, Any] = {}
+
+    @property
+    def rows(self) -> Sequence[dict[str, Any]]:
+        return self._rows
 
     def values(self, field: str) -> Counter[str]:
         if field not in self._values:
@@ -195,7 +235,7 @@ class Vocabulary:
         """Catalog values equal to `value` after normalization and aliasing."""
         known = self.values(field)
         key = normalize_value(value)
-        aliases = VALUE_ALIASES.get(field, {})
+        aliases = self.aliases.get(field, {})
         table = {normalize_value(k): v for k, v in aliases.items()}
         alias = table.get(key) or table.get(stem(key))
         targets = {key, stem(key)} | ({normalize_value(alias)} if alias else set())
@@ -206,7 +246,7 @@ class Vocabulary:
         key = normalize_value(value)
         by_key = {normalize_value(v): v for v in known}
         close = [by_key[k] for k in difflib.get_close_matches(key, list(by_key), n=n, cutoff=0.6)]
-        table = {normalize_value(k): v for k, v in VALUE_ALIASES.get(field, {}).items()}
+        table = {normalize_value(k): v for k, v in self.aliases.get(field, {}).items()}
         for alias_key, target in table.items():
             if target in known and target not in close and (difflib.SequenceMatcher(None, key, alias_key).ratio() > 0.7):
                 close.insert(0, target)
@@ -272,7 +312,7 @@ def compile_condition(condition: Condition, vocabulary: Vocabulary, warnings: li
         matches = vocabulary.canonical(field, value)
         if not matches:
             suggestions = vocabulary.suggest(field, value)
-            if field in CONTROLLED_FIELDS:
+            if field in vocabulary.controlled:
                 hint = (f"Closest values: {', '.join(repr(s) for s in suggestions)}. " if suggestions else "")
                 raise UnknownValueError(f"No sample has {field}={value!r} in this release",
                                         hint=hint + f"List values with 'sda-db values {field}' (MCP: field_values).")
@@ -289,12 +329,100 @@ def compile_condition(condition: Condition, vocabulary: Vocabulary, warnings: li
     return equal
 
 
+MONDO_ID = re.compile(r"mondo[:_ ]?([0-9]{7})\Z", re.IGNORECASE)
+
+
+def disease_term_predicate(values: Sequence[Any], vocabulary: Vocabulary, warnings: list[str]):
+    """Metadata v2 disease filter: a MONDO ID exactly, or a MONDO name exactly or as a case-insensitive
+    substring (e.g. 'fibrosis' matches 'pulmonary fibrosis'). Ancestor terms are not expanded."""
+    ids: set[str] = set()
+    needles: list[str] = []
+    names = list(vocabulary.values("disease_ontology_names"))
+    known_ids = vocabulary.values("disease_ontology_ids")
+    for value in values:
+        text = str(value).strip()
+        if not text:
+            raise UnknownValueError("disease needs a MONDO ID or a disease name")
+        found = MONDO_ID.fullmatch(text)
+        if found:
+            ids.add(f"MONDO:{found.group(1)}")
+            if f"MONDO:{found.group(1)}" not in known_ids:
+                warnings.append(f"No sample has the disease term MONDO:{found.group(1)} (ancestors are not expanded; "
+                                "list terms with 'sda-db values disease_ontology_ids')")
+            continue
+        needle = text.casefold()
+        needles.append(needle)
+        if not any(needle in name.casefold() for name in names):
+            close = difflib.get_close_matches(needle, [n.casefold() for n in names], n=3, cutoff=0.6)
+            warnings.append(f"No sample has a disease term containing {text!r}"
+                            + (f"; similar terms: {', '.join(repr(c) for c in close)}" if close else "")
+                            + ". Use where='disease~TEXT' to search the disease text as reported in GEO.")
+
+    def disease(row: dict[str, Any]) -> bool:
+        if ids and ids & set(members("disease_ontology_ids", row.get("disease_ontology_ids"))):
+            return True
+        row_names = [n.casefold() for n in members("disease_ontology_names", row.get("disease_ontology_names"))]
+        return any(needle in name for needle in needles for name in row_names)
+    return disease
+
+
+def organism_predicate(values: Sequence[Any], vocabulary: Vocabulary, warnings: list[str]):
+    """Metadata v2 organism filter: scientific name, NCBI common name, taxon ID or a common alias ('human');
+    any listed host species of a sample counts (xenografts and mixed entries list several)."""
+    if "species_synonyms" not in vocabulary.cache:
+        synonyms: dict[str, set[str]] = defaultdict(set)
+        labels: dict[str, str] = {}
+
+        def add(key: Any, name: str) -> None:
+            if key:
+                synonyms[normalize_value(key)].add(name)
+                labels.setdefault(normalize_value(key), str(key))
+        for row in vocabulary.rows:
+            first = row.get("organism")
+            if first:
+                for key in (first, row.get("organism_common_name"), row.get("organism_taxon_id")):
+                    add(key, first)
+            listed = members("organisms", row.get("organisms"))
+            taxa = members("organism_taxon_ids", row.get("organism_taxon_ids"))
+            for name, taxon in zip(listed, taxa if len(taxa) == len(listed) else [None] * len(listed)):
+                add(name, name)
+                add(taxon, name)
+        vocabulary.cache["species_synonyms"] = (dict(synonyms), labels)
+    synonyms, labels = vocabulary.cache["species_synonyms"]
+    aliases = {normalize_value(k): v for k, v in ORGANISM_NAMES.items()}
+    accepted: set[str] = set()
+    for value in values:
+        key = normalize_value(value)
+        names = set().union(*(synonyms.get(k, set()) for k in {key, stem(key)}))
+        if not names and key in aliases:
+            names = synonyms.get(normalize_value(aliases[key]), set())
+        if not names:
+            close = difflib.get_close_matches(key, list(labels), n=5, cutoff=0.6)
+            hint = (f"Closest values: {', '.join(repr(labels[c]) for c in close)}. " if close else "")
+            raise UnknownValueError(f"No sample has organism={value!r} in this release",
+                                    hint=hint + "List values with 'sda-db values organism' or organism_common_name.")
+        accepted |= {normalize_value(n) for n in names}
+
+    def organism(row: dict[str, Any]) -> bool:
+        return any(normalize_value(m) in accepted
+                   for m in members("organisms", row.get("organisms")) or members("organism", row.get("organism")))
+    return organism
+
+
 # ---------------------------------------------------------------------------
 # Ranked keyword search (BM25 over sample fields plus the sample's study text)
 
 SAMPLE_FIELD_WEIGHTS = {"gsm": 3.0, "gse": 3.0, "tissue": 2.5, "disease": 2.5, "condition": 1.5,
                         "organism": 2.0, "platform": 2.0, "technology": 1.0, "image_stain": 1.5,
-                        "observation_unit": 1.0}
+                        "observation_unit": 1.0,
+                        # metadata v2 (absent in releases without it, whose index is unchanged)
+                        "organ": 2.0, "tissue_ontology_name": 2.0, "disease_ontology_names": 2.5,
+                        "sample_kind": 1.0, "life_stage": 1.0, "assay_name": 1.5, "assay_type": 0.5,
+                        "organism_common_name": 1.0, "preservation": 1.0}
+V2_INDEXED = frozenset({"organ", "tissue_ontology_name", "disease_ontology_names", "sample_kind", "life_stage",
+                        "assay_name", "assay_type", "organism_common_name", "preservation"})
+UNINFORMATIVE = frozenset({"not stated", "unknown", "other", "not named in GEO",
+                           "other (named, not in list)", "other (named in GEO, not in list)"})  # v2 placeholders, not indexed
 STUDY_FIELD_WEIGHTS = {"title": 2.0, "design": 1.5, "summary": 1.0}
 K1, B = 1.2, 0.75
 
@@ -359,7 +487,7 @@ class TextIndex:
             parts = []
             for field, weight in SAMPLE_FIELD_WEIGHTS.items():
                 value = row.get(field)
-                if value in (None, ""):
+                if value in (None, "") or (field in V2_INDEXED and value in UNINFORMATIVE):
                     continue
                 text = str(value)
                 if field == "organism":

@@ -31,6 +31,8 @@ class Release:
     rolling: bool = False
     feature_index: dict[str, str] | None = None
     subset: dict[str, str] | None = None
+    metadata: dict[str, Any] | None = None
+    data_release: str | None = None
 
     @property
     def short(self) -> str:
@@ -41,6 +43,8 @@ class Release:
                 "sample_count": self.sample_count, "source_release": self.source_release,
                 "public_catalog": (f"{self.public_repo_id}@{self.public_revision}" if self.public_repo_id else None),
                 "rolling": self.rolling, "feature_index": bool(self.feature_index),
+                "metadata": (f"{self.metadata['schema']} ({self.metadata['tag']})" if self.metadata else None),
+                "data_release": self.data_release,
                 "login_needed_for_files": self.repo_id == "Biogod/SpatialDataAgent-DB", "description": self.description}
 
 
@@ -61,12 +65,32 @@ def _from_record(record: dict[str, Any], repo_id: str) -> Release:
                    sample_count=record.get("sample_count"), source_release=record.get("source_release"),
                    files=dict(record.get("files", {})), public_repo_id=public.get("repo_id"),
                    public_revision=public.get("revision"), feature_index=record.get("feature_index"),
-                   subset=record.get("subset"))
+                   subset=record.get("subset"), metadata=record.get("metadata"),
+                   data_release=record.get("data_release"))
 
 
 def known_releases() -> list[Release]:
     reg = registry()
     return [_from_record(record, reg["repo_id"]) for record in reg["releases"]]
+
+
+def named_release(name: str | None, *, repo_id: str | None = None) -> Release | None:
+    """A registered release by name, alias or tag, without network access; None otherwise."""
+    reg = registry()
+    if not name or (repo_id and repo_id != reg["repo_id"]):
+        return None
+    for record in reg["releases"]:
+        if name == record["name"] or name in record.get("aliases", []) or name == record.get("tag"):
+            return _from_record(record, reg["repo_id"])
+    return None
+
+
+def recorded_release(record: dict[str, Any]) -> str:
+    """The release to re-open for a saved selection: its named release when that is bound to the same
+    commit (so metadata layers such as v2 come back), else the recorded commit."""
+    named = named_release(record.get("release"), repo_id=record.get("repo_id"))
+    revision = record.get("revision")
+    return named.name if named is not None and (not revision or named.revision == revision) else revision
 
 
 def default_release() -> Release:
@@ -87,8 +111,12 @@ def resolve_release(name: str | None = None, *, repo_id: str | None = None,
         for record in reg["releases"]:
             if wanted == record["name"] or wanted in record.get("aliases", []) or wanted == record.get("tag"):
                 return _from_record(record, repo)
-            if COMMIT.fullmatch(wanted) and wanted == record["revision"]:
-                return _from_record(record, repo)
+        # A bare data commit means the release as published at that commit, without later metadata layers
+        # (e.g. the paper commit resolves to the paper release, not to v1.1.0 with metadata v2).
+        if COMMIT.fullmatch(wanted):
+            for record in sorted(reg["releases"], key=lambda r: bool(r.get("metadata"))):
+                if wanted == record["revision"]:
+                    return _from_record(record, repo)
     if COMMIT.fullmatch(wanted):
         return Release(name=wanted[:7], repo_id=repo, revision=wanted, description="Explicit commit")
     latest = reg["latest"]
