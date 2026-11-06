@@ -80,13 +80,13 @@ def main() -> None:
                          env=anonymous, timeout=300)
     payload = json.loads(out.stdout or "{}")
     check(record, "metadata v2 search without a token", out.returncode == 0 and payload.get("total", 0) > 0
-          and payload.get("metadata") == "metadata-v2.1-20261105",
+          and payload.get("metadata") == "metadata-v2.2.1-20261106",
           {"total": payload.get("total"), "metadata": payload.get("metadata")})
     curated = sda_db.open_catalog()
     paper = sda_db.open_catalog("paper")
     check(record, "default release = paper data + metadata v2",
           (curated.release_name, len(curated), curated.revision == paper.revision, bool(curated.metadata_v2))
-          == ("v1.1.0-20261105", 12163, True, True),
+          == ("v1.1.1-20261106", 12163, True, True),
           {"commit": curated.revision, "metadata": (curated.metadata_v2 or {}).get("tag"),
            "platform_changes": sum(1 for r in curated.rows if r["platform"] != r["platform_v3"])})
     catalog = paper

@@ -87,7 +87,7 @@ _FILTERS: dict[str, Any] = {
     "gene_match": {"type": "string", "enum": ["all", "any"], "description": "With several genes: all (default) or any."},
     "match": {"type": "string", "enum": ["all", "any"], "description": "Keyword logic (default all)."},
     "sort": {"type": "string", "description": "Sort by field; prefix '-' for descending, e.g. '-n_obs'."},
-    "release": {"type": "string", "description": "Release name, 'latest' or commit (default: v1.1.0-20261105 = paper "
+    "release": {"type": "string", "description": "Release name, 'latest' or commit (default: v1.1.1-20261106 = paper "
                 "data + metadata v2; 'paper' = the paper release as published)."},
 }
 _READ = {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True}
@@ -367,7 +367,7 @@ class Server:
                     "citations": selection.cite(format=args.get("style", "bibtex"))}
 
         @tool("list_releases", "List releases", "Database releases this client knows; the default is "
-              "v1.1.0-20261105 (paper data + curated metadata v2), 'paper' is the paper release as published, and "
+              "v1.1.1-20261106 (paper data + curated metadata v2), 'paper' is the paper release as published, and "
               "'latest' is the rolling release with daily reviewed additions.", _schema({}))
         def list_releases(args: dict[str, Any]) -> dict[str, Any]:
             from .releases import known_releases, registry

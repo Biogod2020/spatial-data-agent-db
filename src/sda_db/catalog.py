@@ -58,8 +58,11 @@ METADATA_V2_FIELDS = (
 # v2 corrects or harmonizes these v3 columns: the v2 value takes the name, the v3 value stays as <name>_v3.
 METADATA_V2_OVERRIDES = ("platform", "organism", "sex", "review_category", "review_notes")
 METADATA_V2_BOOLEANS = frozenset({"xenograft", "multi_species"})
+# Columns added by later metadata v2 versions (sex_source: 2.2.1); joined only when the table has them, so
+# earlier tables (e.g. 2.1 of release v1.1.0-20261105) load exactly as before.
+METADATA_V2_OPTIONAL = ("sex_source",)
 # v2 fields that exist only with metadata v2; used for clearer errors on releases without it.
-METADATA_V2_ONLY = frozenset(METADATA_V2_FIELDS) | {"annotation_min_confidence"} | {
+METADATA_V2_ONLY = frozenset(METADATA_V2_FIELDS + METADATA_V2_OPTIONAL) | {"annotation_min_confidence"} | {
     f"{name}_v3" for name in METADATA_V2_OVERRIDES}
 V2_SUMMARY_FIELDS = ("organ", "sample_kind", "disease_status", "disease_ontology_names", "assay_name")
 
@@ -139,6 +142,7 @@ def read_metadata_v2(path: Path) -> list[dict[str, Any]]:
         wanted = {"gsm", "published_gse", *METADATA_V2_FIELDS, *METADATA_V2_OVERRIDES}
         if missing := wanted - set(reader.fieldnames or []):
             raise IntegrityError(f"{path.name} lacks metadata v2 columns: {sorted(missing)}")
+        wanted |= set(METADATA_V2_OPTIONAL) & set(reader.fieldnames or [])
         records = []
         for number, raw in enumerate(reader, 2):
             record: dict[str, Any] = {k: (raw[k] if raw[k] != "" else None) for k in wanted}
@@ -151,7 +155,9 @@ def read_metadata_v2(path: Path) -> list[dict[str, Any]]:
             if record["annotation_confidence"]:
                 try:
                     scores = json.loads(record["annotation_confidence"])
-                    confidence = min(float(v) for v in scores.values() if v is not None) if scores else None
+                    # null = the field was corrected by hand (metadata 2.2.1+): human-checked, not uncertain
+                    model = [float(v) for v in scores.values() if v is not None]
+                    confidence = min(model) if model else None
                 except (ValueError, TypeError, AttributeError) as exc:
                     raise IntegrityError(f"{path.name} line {number}: invalid annotation_confidence") from exc
             record["annotation_min_confidence"] = confidence
@@ -366,8 +372,9 @@ class Catalog:
             for name in METADATA_V2_OVERRIDES:
                 row[f"{name}_v3"] = row.get(name) if row.get(name) != "" else None
                 row[name] = record[name]
-            for name in METADATA_V2_FIELDS:
-                row[name] = record[name]
+            for name in METADATA_V2_FIELDS + METADATA_V2_OPTIONAL:
+                if name in record:
+                    row[name] = record[name]
             row["annotation_min_confidence"] = record["annotation_min_confidence"]
         self.metadata_v2 = dict(info)
         self._shared = {"rows": self.rows}
@@ -525,6 +532,7 @@ class Catalog:
           species matches.
         - ``min_confidence``: keep samples whose lowest annotation confidence (organ, sample kind, disease
           status, UBERON term, life stage) is at least this value (0-1; 0.6 drops every low-confidence call).
+          Fields corrected by hand have a null confidence and count as passing.
         - ``exclude_flags``: True drops every sample with a ``metadata_flags`` entry; a flag name or list
           drops only those (e.g. 'normal_but_disease_text', 'feature_species_differs').
 
@@ -545,7 +553,7 @@ class Catalog:
             if key not in vocabulary.fields and key in METADATA_V2_ONLY:
                 raise UnknownFieldError(f"{key!r} comes with curated metadata v2, which release "
                                         f"{self.release_name} does not include",
-                                        hint="Open the default release (v1.1.0-20261105, alias metadata-v2); "
+                                        hint="Open the default release (v1.1.1-20261106, alias metadata-v2); "
                                              "the paper release keeps its original v3 metadata.")
             if key not in vocabulary.fields:
                 close = difflib.get_close_matches(key, vocabulary.fields, n=1, cutoff=0.6)
@@ -562,12 +570,19 @@ class Catalog:
         if (min_confidence is not None or exclude_flags not in (None, False)) and not self.metadata_v2:
             raise UnknownFieldError(f"min_confidence and exclude_flags need curated metadata v2, which release "
                                     f"{self.release_name} does not include",
-                                    hint="Open the default release (v1.1.0-20261105, alias metadata-v2).")
+                                    hint="Open the default release (v1.1.1-20261106, alias metadata-v2).")
         if min_confidence is not None:
             if isinstance(min_confidence, bool) or not isinstance(min_confidence, (int, float)) \
                     or not 0 <= min_confidence <= 1:
                 raise UnknownValueError("min_confidence must be a number from 0 to 1", hint="Example: 0.6")
-            conditions.append(Condition("annotation_min_confidence", ">=", (float(min_confidence),)))
+            limit = float(min_confidence)
+
+            def confident(row: dict[str, Any]) -> bool:
+                # A null field confidence marks a hand-corrected (human-checked) field: it passes. A row whose
+                # annotated fields are all hand-corrected has no model confidence left and passes as well.
+                lowest = row.get("annotation_min_confidence")
+                return lowest >= limit if lowest is not None else bool(row.get("annotation_confidence"))
+            special.append((Condition("annotation_min_confidence", ">=", (limit,)), confident))
         if exclude_flags is True or (isinstance(exclude_flags, str) and exclude_flags.strip().casefold()
                                      in {"any", "all", "true"}):
             conditions.append(Condition("metadata_flags", "=", ("",)))
@@ -808,7 +823,9 @@ class Catalog:
                         "disease_status_source": row.get("disease_status_source"),
                         "disease_ontology_ids": listed("disease_ontology_ids"),
                         "disease_ontology_names": listed("disease_ontology_names")},
-            "donor": pick("life_stage", "life_stage_source", "sex", "donor_key"),
+            "donor": {**pick("life_stage", "life_stage_source", "sex"),
+                      **({"sex_source": row["sex_source"]} if "sex_source" in row else {}),
+                      **pick("donor_key")},
             "species": {**pick("organism", "organism_taxon_id", "organism_common_name", "feature_species",
                                "xenograft", "multi_species"),
                         "organisms": listed("organisms"), "co_detected_organisms": listed("co_detected_organisms")},

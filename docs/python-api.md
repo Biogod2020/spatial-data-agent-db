@@ -17,7 +17,7 @@ extra (anndata, NumPy, pandas, tifffile).
 | `Catalog.from_hub(revision=...)` | Client 0.1–0.2 behaviour: `catalog/samples.csv` from the gated dataset only |
 | `sda_db.known_releases()`, `sda_db.resolve_release(name)` | Release registry; `latest` resolves `main` to a commit once |
 
-- **Release names.** `release` takes a name (`v1.1.0-20261105`, the default: paper data plus metadata v2;
+- **Release names.** `release` takes a name (`v1.1.1-20261106`, the default: paper data plus metadata v2;
   `v1.0.0-20261025` for the paper release as published), an alias (`metadata-v2`, `paper`, `v1`), a tag,
   `latest`, or a full commit (a bare commit opens the release without metadata v2).
 - **Metadata v2 filters.** `search(organ=..., disease=..., disease_status=..., sample_kind=..., life_stage=...,

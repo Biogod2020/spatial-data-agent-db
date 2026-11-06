@@ -118,9 +118,9 @@ import sda_db
 
 adata = sda_db.load("GSM6963121", release="starter")   # 无需登录；只取表达矩阵，保存到 ./downloads
 
-catalog = sda_db.open_catalog()                  # v1.1.0-20261105：论文数据 + 元数据 v2；检索无需登录
+catalog = sda_db.open_catalog()                  # v1.1.1-20261106：论文数据 + 元数据 v2；检索无需登录
 hits = catalog.search("alzheimer hippocampus", organism="human", has_image=True)
-print(hits)                                      # <Catalog release=v1.1.0-20261105 commit=999566b samples=... >
+print(hits)                                      # <Catalog release=v1.1.1-20261106 commit=999566b samples=... >
 fibrosis = catalog.search(organ="lung", disease="fibrosis", min_confidence=0.6)   # 整理后的字段（见下文）
 paper = sda_db.open_catalog("paper")             # 与论文完全一致的论文版本
 hits.to_pandas()[["gsm", "tissue", "disease", "n_obs", "score"]]
@@ -221,14 +221,14 @@ claude mcp add sda-db -- uvx --from "git+https://github.com/Biogod2020/spatial-d
 
 ## 整理后的元数据 v2
 
-默认版本 `v1.1.0-20261105` 就是论文版本（同一提交、同一批文件），外加一张整理后的元数据表
+默认版本 `v1.1.1-20261106` 就是论文版本（同一提交、同一批文件），外加一张整理后的元数据表
 [metadata v2](https://huggingface.co/datasets/Biogod/SpatialDataAgent-DB-Catalog/tree/main/metadata/v2)
-（标签 `metadata-v2.1-20261105`），按 GSM 接到每个样本上。新增内容：
+（版本 2.2.1，标签 `metadata-v2.2.1-20261106`，含人工审核后的更正），按 GSM 接到每个样本上。新增内容：
 
 - `organ`（固定的 43 个器官）、`tissue_ontology_id`/`_name`（UBERON）和 `sample_kind`（原发组织、肿瘤组织、
   转移灶、类器官、异种移植等）；
 - `disease_status`（normal / disease / perturbation / not stated）和 `disease_ontology_ids`/`_names`（MONDO）；
-- `life_stage`、统一后的 `sex`、`donor_key`；`organism_taxon_id`、`organism_common_name`、`organisms`；
+- `life_stage`、统一后的 `sex` 及其依据 `sex_source`、`donor_key`；`organism_taxon_id`、`organism_common_name`、`organisms`；
 - `assay_name`、`assay_type`（基于成像或基于测序）、`preservation` 和 PubMed ID；
 - 204 个样本的 `platform` 经过更正（原发布值保留在 `platform_v3`，同样有 `organism_v3`、`sex_v3`）；
 - 每个字段的置信度、`annotation_low_confidence` 和 `metadata_flags`。
@@ -256,7 +256,8 @@ sda-db values organ --sample-kind "tumour tissue"
 
 | 版本 | 提交 | 样本数 | 说明 |
 |---|---|---:|---|
-| `v1.1.0-20261105`（默认；别名 `metadata-v2`、`v1.1`） | `999566b` | 12,163 | 论文数据和文件，外加整理后的元数据 v2（标签 `metadata-v2.1-20261105`） |
+| `v1.1.1-20261106`（默认；别名 `metadata-v2`、`metadata-v2.2.1`、`v1.1`） | `999566b` | 12,163 | 论文数据和文件，外加整理后的元数据 v2.2.1（标签 `metadata-v2.2.1-20261106`） |
+| `v1.1.0-20261105`（别名 `metadata-v2.1`、`v1.1.0`） | `999566b` | 12,163 | 同一数据加元数据 v2.1（标签 `metadata-v2.1-20261105`），即客户端 0.4.0 的默认版本；为可复现保留 |
 | `v1.0.0-20261025`（别名 `paper`、`v1`） | `999566b` | 12,163 | 论文发布时的原样（v3 元数据）；目录公开并以 SHA256 绑定，文件需要访问权限 |
 | `latest` | 打开时解析 | 持续增长 | 每日新增经审核样本的滚动版本；需要访问权限 |
 

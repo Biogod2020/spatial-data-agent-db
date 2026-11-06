@@ -30,6 +30,7 @@ CONTROLLED_FIELDS = frozenset({
 # Controlled only when a release carries metadata v2 (in v3, 'sex' is free text as reported).
 V2_CONTROLLED_FIELDS = frozenset({
     "organ", "organ_source", "sample_kind", "disease_status", "disease_status_source", "life_stage", "sex",
+    "sex_source", "life_stage_source",
     "preservation", "assay_type", "assay_name", "annotation_version", "annotation_low_confidence", "metadata_flags",
     "organism_common_name", "feature_species", "platform_basis"})
 

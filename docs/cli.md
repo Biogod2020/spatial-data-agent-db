@@ -10,7 +10,7 @@ picks `table`, `json`, `jsonl`, `csv`, `tsv` or `ids` where offered). Notes and 
 stdout stays machine-readable.
 
 **Releases.** `--release NAME` chooses a release: a name, alias, tag, `latest` or a full commit. The default
-is `v1.1.0-20261105`: the paper data (commit `999566b`) plus curated metadata v2. `--release paper` gives the paper
+is `v1.1.1-20261106`: the paper data (commit `999566b`) plus curated metadata v2. `--release paper` gives the paper
 release `v1.0.0-20261025` exactly as published. `sda-db releases` lists the choices. Every JSON result names
 `release` and `commit`.
 

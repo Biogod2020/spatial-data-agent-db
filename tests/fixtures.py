@@ -112,7 +112,8 @@ V2_COLUMNS = ("gsm", "published_gse", "platform", "organism", "sex", "review_cat
               "organism_taxon_ids", "co_detected_organisms", "xenograft", "multi_species", "organism_basis",
               "organism_raw", "feature_species", "preservation", "preservation_raw", "platform_basis", "assay_name",
               "assay_type", "technology_raw", "panel_name", "instrument_software", "pubmed_ids", "dois",
-              "annotation_version", "annotation_confidence", "annotation_low_confidence", "metadata_flags", "n_obs")
+              "annotation_version", "annotation_confidence", "annotation_low_confidence", "metadata_flags", "n_obs",
+              "sex_source")
 
 
 def _v2(gsm: str, gse: str, *, confidence: dict[str, float] | None = None, **values: Any) -> dict[str, str]:
@@ -130,6 +131,8 @@ def _v2(gsm: str, gse: str, *, confidence: dict[str, float] | None = None, **val
     flags = (["low_confidence_annotation"] if low else []) + values.pop("flags", [])
     base["metadata_flags"] = ";".join(flags)
     base.update({k: str(v) for k, v in values.items()})
+    base.setdefault("sex_source", "")
+    base["sex_source"] = base["sex_source"] or ("not stated" if base["sex"] == "unknown" else "extracted field")
     return base
 
 
@@ -142,7 +145,7 @@ def metadata_v2_rows() -> list[dict[str, str]]:
             sex="female", preservation="FFPE", assay_name="Visium CytAssist", pubmed_ids="111;999"),
         _v2("GSM2", "GSE10", organ="brain", tissue_ontology_id="UBERON:0001870",
             tissue_ontology_name="frontal cortex", sample_kind="primary tissue", disease_status="normal",
-            life_stage="aged", sex="male", preservation="fresh frozen", confidence={"disease_status": 0.5},
+            life_stage="aged", sex="male", sex_source="sample text", preservation="fresh frozen", confidence={"disease_status": 0.5},
             flags=["normal_but_disease_text"]),
         _v2("GSM3", "GSE20", platform="Xenium", organism="Mus musculus", organ="kidney",
             tissue_ontology_id="UBERON:0002113", tissue_ontology_name="kidney", sample_kind="primary tissue",
@@ -161,19 +164,20 @@ def metadata_v2_rows() -> list[dict[str, str]]:
     ]
 
 
-def write_metadata_v2(path: Path, data: list[dict[str, str]] | None = None) -> Path:
+def write_metadata_v2(path: Path, data: list[dict[str, str]] | None = None, *, columns: tuple[str, ...] = V2_COLUMNS
+                      ) -> Path:
     import csv
 
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(V2_COLUMNS))
+        writer = csv.DictWriter(handle, fieldnames=list(columns), extrasaction="ignore")
         writer.writeheader()
         writer.writerows(metadata_v2_rows() if data is None else data)
     return path
 
 
 def metadata_v2_info(path: Path) -> dict[str, Any]:
-    return {"schema": "sda-sample-metadata-2", "tag": "metadata-v2.1-20261105",
+    return {"schema": "sda-sample-metadata-2", "tag": "metadata-v2.2.1-20261106",
             "repo_id": "Biogod/SpatialDataAgent-DB-Catalog", "revision": "a" * 40,
             "gated_repo_id": "Biogod/SpatialDataAgent-DB", "gated_revision": "b" * 40,
             "path": "metadata/v2/samples_metadata_v2.csv", "sha256": digest(path.read_bytes())}

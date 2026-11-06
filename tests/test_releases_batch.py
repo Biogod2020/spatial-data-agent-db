@@ -36,7 +36,7 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(default.revision, DEFAULT_REVISION)
         self.assertEqual(default.public_repo_id, PUBLIC)
         paper = resolve_release("paper")
-        self.assertEqual((default.name, paper.name), ("v1.1.0-20261105", "v1.0.0-20261025"))
+        self.assertEqual((default.name, paper.name), ("v1.1.1-20261106", "v1.0.0-20261025"))
         self.assertEqual(paper.revision, default.revision)  # metadata v2 adds no data commit
         self.assertEqual(resolve_release(default.revision).name, paper.name)  # a bare commit is the paper release
         self.assertEqual(resolve_release("sdk-0.2").revision, "8f116b867ce4097957d4209db712d37bae3c9369")
