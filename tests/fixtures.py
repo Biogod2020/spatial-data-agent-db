@@ -177,7 +177,7 @@ def write_metadata_v2(path: Path, data: list[dict[str, str]] | None = None, *, c
 
 
 def metadata_v2_info(path: Path) -> dict[str, Any]:
-    return {"schema": "sda-sample-metadata-2", "tag": "metadata-v2.2-20261106",
+    return {"schema": "sda-sample-metadata-2", "tag": "metadata-v2.2.1-20261106",
             "repo_id": "Biogod/SpatialDataAgent-DB-Catalog", "revision": "a" * 40,
             "gated_repo_id": "Biogod/SpatialDataAgent-DB", "gated_revision": "b" * 40,
             "path": "metadata/v2/samples_metadata_v2.csv", "sha256": digest(path.read_bytes())}

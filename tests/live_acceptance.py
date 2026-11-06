@@ -80,7 +80,7 @@ def main() -> None:
                          env=anonymous, timeout=300)
     payload = json.loads(out.stdout or "{}")
     check(record, "metadata v2 search without a token", out.returncode == 0 and payload.get("total", 0) > 0
-          and payload.get("metadata") == "metadata-v2.2-20261106",
+          and payload.get("metadata") == "metadata-v2.2.1-20261106",
           {"total": payload.get("total"), "metadata": payload.get("metadata")})
     curated = sda_db.open_catalog()
     paper = sda_db.open_catalog("paper")

@@ -2,16 +2,18 @@
 
 ## 0.4.1 — 2026-11-06
 
-- New default release `v1.1.1-20261106` (aliases `metadata-v2`, `metadata-v2.2`, `v1.1`): the same paper data
-  (`999566b`) with curated metadata **v2.2** (tag `metadata-v2.2-20261106`; public catalog `b67c231`, gated
-  `564547d`). v2.2 carries corrections from a human review of 200 samples: life stage 51 samples, sex 77, disease
+- New default release `v1.1.1-20261106` (aliases `metadata-v2`, `metadata-v2.2.1`, `v1.1`): the same paper data
+  (`999566b`) with curated metadata **v2.2.1** (tag `metadata-v2.2.1-20261106`; public catalog `2511bb7`, gated
+  `b90f301`). It carries corrections from a human review of 200 samples: life stage 51 samples, sex 77, disease
   terms 25, disease status 8, organ/UBERON 1. All nine `metadata/v2` SHA256s are recorded.
 - New field `sex_source` (extracted field / sample text / manual / not stated). It is filterable
   (`sex_source="sample text"`, CLI `--where`), listed by `fields()` and shown in `card()["curated"]["donor"]`.
 - `v1.1.0-20261105` (metadata v2.1, the 0.4.0 default) stays resolvable as `v1.1.0-20261105`,
   `metadata-v2.1` or `v1.1.0`. The aliases `metadata-v2` and `v1.1` now point to `v1.1.1-20261106`.
 - Tables without `sex_source` (v2.1) load exactly as in 0.4.0.
-- `cite()` names the metadata tag of the release in use (`sdadb_metadata_v2_2_20261106`).
+- A hand-corrected field has a null `annotation_confidence` (since v2.2.1). `min_confidence` treats it as
+  human-checked, so it passes instead of being dropped.
+- `cite()` names the metadata tag of the release in use (`sdadb_metadata_v2_2_1_20261106`).
 
 ## 0.4.0 — 2026-11-05
 

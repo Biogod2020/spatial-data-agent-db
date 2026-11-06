@@ -39,7 +39,7 @@ class RegistryTests(Offline):
     def test_default_release_is_paper_data_plus_metadata_v2(self) -> None:
         default, paper = resolve_release(None), resolve_release("paper")
         self.assertEqual(default.name, "v1.1.1-20261106")
-        for alias in ("metadata-v2", "metadata-v2.2", "v1.1", "v1.1.1"):
+        for alias in ("metadata-v2", "metadata-v2.2.1", "v1.1", "v1.1.1"):
             self.assertEqual(resolve_release(alias).name, default.name)
         self.assertEqual(default.revision, paper.revision)
         self.assertEqual(default.files, paper.files)  # same catalog bytes
@@ -47,7 +47,7 @@ class RegistryTests(Offline):
         self.assertEqual(default.data_release, "v1.0.0-20261025")
         meta = default.metadata
         self.assertEqual((meta["tag"], meta["path"], meta["schema"]),
-                         ("metadata-v2.2-20261106", V2_PATH, "sda-sample-metadata-2"))
+                         ("metadata-v2.2.1-20261106", V2_PATH, "sda-sample-metadata-2"))
         self.assertEqual(meta["files"][V2_PATH], meta["sha256"])
         self.assertTrue(all(len(v) == 64 for v in meta["files"].values()))
         self.assertIsNone(paper.metadata)
@@ -105,8 +105,8 @@ class OpenTests(Offline):
 
     def test_join_adds_v2_and_keeps_v3_values(self) -> None:
         catalog = self.open()
-        self.assertIn((PUBLIC, V2_PATH, "b67c2315707e236485dbcd3b1cba493acd030df2"), self.calls)
-        self.assertEqual(catalog.metadata_v2["tag"], "metadata-v2.2-20261106")
+        self.assertIn((PUBLIC, V2_PATH, "2511bb73cdbebffe393c3d8f1b136183049b435a"), self.calls)
+        self.assertEqual(catalog.metadata_v2["tag"], "metadata-v2.2.1-20261106")
         gsm1, gsm5 = catalog.get("GSM1"), catalog.get("GSM5")
         self.assertEqual((gsm1["organ"], gsm1["tissue_ontology_id"], gsm1["disease_ontology_ids"]),
                          ("brain", "UBERON:0002421", "MONDO:0004975"))
@@ -123,7 +123,7 @@ class OpenTests(Offline):
 
     def test_gated_source_reads_metadata_from_the_gated_tag_commit(self) -> None:
         catalog = self.open(source="gated")
-        self.assertIn(("Biogod/SpatialDataAgent-DB", V2_PATH, "564547da4029f21f230d4d968d4b5806f6e1d3f6"), self.calls)
+        self.assertIn(("Biogod/SpatialDataAgent-DB", V2_PATH, "b90f301351983ed4bdb13550fda25320ccfc98ba"), self.calls)
         self.assertEqual(catalog.get("GSM4")["organ"], "breast")
 
     def test_paper_release_is_unchanged(self) -> None:
@@ -248,6 +248,31 @@ class FilterTests(Offline):
             self.catalog.search(min_confidence=1.5)
         self.assertEqual(self.catalog.search(where="annotation_min_confidence<0.6").gsms, ["GSM2"])
 
+    def test_null_confidence_means_hand_corrected_and_passes(self) -> None:
+        import fixtures as f
+        from sda_db.catalog import read_metadata_v2
+
+        rows = f.metadata_v2_rows()
+        # GSM2: disease_status was corrected by hand (null), the rest is confident; GSM4: every field by hand.
+        rows[1]["annotation_confidence"] = json.dumps({"organ": 1.0, "sample_kind": 1.0, "disease_status": None,
+                                                       "uberon": 0.95, "life_stage": 1.0})
+        rows[1]["annotation_low_confidence"] = ""
+        rows[3]["annotation_confidence"] = json.dumps({k: None for k in ("organ", "sample_kind", "disease_status",
+                                                                         "uberon", "life_stage")})
+        path = f.write_metadata_v2(self.root / "v221.csv", rows)
+        catalog = f.catalog()
+        catalog._attach_metadata_v2(read_metadata_v2(path), f.metadata_v2_info(path))
+        self.assertEqual(catalog.get("GSM2")["annotation_min_confidence"], 0.95)
+        self.assertIsNone(catalog.get("GSM4")["annotation_min_confidence"])
+        self.assertEqual(catalog.search(min_confidence=0.6).gsms, ["GSM1", "GSM2", "GSM3", "GSM4", "GSM5"])
+        self.assertEqual(catalog.search(min_confidence=0.96).gsms, ["GSM4"])  # others: uberon 0.95 is the model's
+        self.assertIsNone(catalog.card("GSM2")["curated"]["annotation"]["confidence"]["disease_status"])
+        rows[0]["annotation_confidence"] = ""  # no confidence recorded at all: not human-checked, fails
+        path = f.write_metadata_v2(self.root / "none.csv", rows)
+        catalog = f.catalog()
+        catalog._attach_metadata_v2(read_metadata_v2(path), f.metadata_v2_info(path))
+        self.assertNotIn("GSM1", catalog.search(min_confidence=0.6).gsms)
+
     def test_keywords_reach_v2_fields_and_aliases_still_work(self) -> None:
         self.assertEqual(self.catalog.search("hippocampal formation").gsms, ["GSM1"])  # UBERON name only
         self.assertEqual(set(self.catalog.search("ffpe").gsms), {"GSM1", "GSM4"})
@@ -282,11 +307,11 @@ class FilterTests(Offline):
 
     def test_cite_names_the_metadata_tag_and_v2_pubmed_ids(self) -> None:
         text = self.catalog.select(["GSM1"]).cite()
-        self.assertIn("metadata-v2.2-20261106", text)
+        self.assertIn("metadata-v2.2.1-20261106", text)
         self.assertIn("curated sample metadata v2", text)
         self.assertIn("PMID 111, 999", text)
         records = json.loads(self.catalog.select(["GSM1"]).cite(format="json"))
-        self.assertEqual(records[2]["key"], "sdadb_metadata_v2_2_20261106")
+        self.assertEqual(records[2]["key"], "sdadb_metadata_v2_2_1_20261106")
         self.assertIn("SHA256 " + self.catalog.metadata_v2["sha256"], records[2]["note"])
         self.assertEqual(records[3]["pmids"], ["111", "999"])
 
@@ -294,7 +319,7 @@ class FilterTests(Offline):
         path = self.root / "cohort.json"
         self.catalog.search(organ="brain").save_selection(path)
         record = json.loads(path.read_text())
-        self.assertEqual(record["metadata"]["tag"], "metadata-v2.2-20261106")
+        self.assertEqual(record["metadata"]["tag"], "metadata-v2.2.1-20261106")
         self.assertEqual(record["samples"][0]["organ"], "brain")
 
 
@@ -331,7 +356,7 @@ class InterfaceTests(Offline):
         self.assertEqual(ids("--exclude-flags", "normal_but_disease_text"), ["GSM1", "GSM3", "GSM4", "GSM5"])
         status, out, _ = self.run_cli("search", "--organ", "brain", "--json")
         payload = json.loads(out)
-        self.assertEqual(payload["metadata"], "metadata-v2.2-20261106")
+        self.assertEqual(payload["metadata"], "metadata-v2.2.1-20261106")
         self.assertIn("organ=brain", payload["filters"])
         status, _, err = self.run_cli("search", "--organ", "brian")
         self.assertNotEqual(status, 0)
@@ -342,7 +367,7 @@ class InterfaceTests(Offline):
     def test_cli_cite_names_the_metadata_tag(self) -> None:
         status, out, _ = self.run_cli("cite", "GSM1")
         self.assertEqual(status, 0)
-        self.assertIn("metadata-v2.2-20261106", out)
+        self.assertIn("metadata-v2.2.1-20261106", out)
 
     def test_mcp_tools_accept_v2_filters(self) -> None:
         server = Server(download_dir=self.root / "mcp")
@@ -357,7 +382,7 @@ class InterfaceTests(Offline):
         self.assertFalse(result["isError"], result)
         content = result["structuredContent"]
         self.assertEqual([s["gsm"] for s in content["samples"]], ["GSM4", "GSM5"])
-        self.assertEqual(content["metadata"], "metadata-v2.2-20261106")
+        self.assertEqual(content["metadata"], "metadata-v2.2.1-20261106")
         result = server.call_tool("search_samples", {"exclude_flags": "any", "organism": "human"})
         self.assertEqual(result["structuredContent"]["total"], 2)
         result = server.call_tool("search_samples", {"min_confidence": True})

@@ -2,22 +2,24 @@
 
 ## Version 0.4.1
 
-Validated on 2026-11-06 against `v1.1.1-20261106`: paper commit `999566b` plus metadata v2.2 (public catalog
-`b67c2315707e236485dbcd3b1cba493acd030df2`, gated tag `metadata-v2.2-20261106` = `564547da4029f21f230d4d968d4b5806f6e1d3f6`).
-All nine `metadata/v2` files were hashed after download from the public commit; the gated table has the same
-SHA256. Also checked: `v1.1.0-20261105` (v2.1), the paper release and `latest` (`db71bcf`).
+Validated on 2026-11-06 against `v1.1.1-20261106`: paper commit `999566b` plus metadata v2.2.1. The public catalog is
+`2511bb73cdbebffe393c3d8f1b136183049b435a`; the gated tag `metadata-v2.2.1-20261106` points to
+`b90f301351983ed4bdb13550fda25320ccfc98ba`. All nine `metadata/v2` files were hashed after download from the
+public commit, and the gated table has the same SHA256. Also checked: `v1.1.0-20261105` (v2.1), the paper release
+and `latest`.
 
-- **Offline tests.** 138 passed: the 136 of 0.4.0, with the release names and tags updated, plus 2 new tests
-  (the 0.4.0 release stays resolvable; tables without `sex_source` load as before). One filter test now also
-  covers `sex_source`.
+- **Offline tests.** 139 passed: the 136 of 0.4.0 (release names and tags updated) plus 3 new tests. They check
+  that the 0.4.0 release stays resolvable, that tables without `sex_source` load as before, and that a null
+  (hand-corrected) confidence passes `min_confidence`. One filter test now also covers `sex_source`.
 - **Paper release.** The `--release paper` output has the same SHA256 values as in 0.3.2 and 0.4.0: rows,
   ranked results, `cite()` and `fields()`.
-- **Live acceptance.** 11 of 11 checks passed in 15.1 s.
-- **Live counts on v1.1.1.** These match the published v2.2 table:
-  - sex: male 2,689, female 2,012, mixed 21, unknown 7,441;
-  - `sex_source`: extracted field 4,645, sample text 77, not stated 7,441;
-  - disease 7,023, normal 3,948, MONDO 6,479, UBERON 11,605.
-- **Release v1.1.0-20261105** still opens with the v2.1 table: no `sex_source`, sex unknown 7,518.
+- **Live acceptance.** 11 of 11 checks passed in 16.2 s.
+- **Live counts on v1.1.1.**
+  - sex: male 2,689, female 2,012, mixed 21, unknown 7,441.
+  - `min_confidence=0.6` keeps 9,050 samples (9,044 with v2.1). The hand-corrected rows GSE233208, GSE297058,
+    GSE315487 and GSE334959 now pass. GSE294844 samples pass unless their model UBERON confidence is below 0.6.
+  - `exclude_flags=True` keeps 9,005.
+- **Release v1.1.0-20261105** still opens with the v2.1 table.
 
 ## Version 0.4.0
 
