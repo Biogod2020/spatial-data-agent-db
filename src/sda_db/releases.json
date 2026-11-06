@@ -1,13 +1,62 @@
 {
   "schema": "sda-db-client-releases-2",
   "repo_id": "Biogod/SpatialDataAgent-DB",
-  "default": "v1.1.0-20261105",
+  "default": "v1.1.1-20261106",
   "releases": [
+    {
+      "name": "v1.1.1-20261106",
+      "aliases": [
+        "metadata-v2",
+        "metadata-v2.2",
+        "v1.1",
+        "v1.1.1"
+      ],
+      "revision": "999566bf516169ba8c9cf1ad9e5a2b722bb8a97a",
+      "data_release": "v1.0.0-20261025",
+      "source_release": "sda-unified-20261010-v3",
+      "sample_count": 12163,
+      "files": {
+        "catalog/samples.csv": "909c4ec50e71c636eadc7bf01a9479fef1b4fd480ac348dfea6b785e566c7bed",
+        "catalog/atlas-sample-metadata.jsonl": "97931a27a014ccd7b31f8a4c36565c0e7a13a122d70c1da63b64db9112738924",
+        "catalog/atlas-study-metadata.jsonl": "4685ed835a24b9a8eb43a14565701fea7e2b146e457466bca9371e7a2c37a6a7"
+      },
+      "public_catalog": {
+        "repo_id": "Biogod/SpatialDataAgent-DB-Catalog",
+        "revision": "b67c2315707e236485dbcd3b1cba493acd030df2"
+      },
+      "feature_index": {
+        "repo_id": "Biogod/SpatialDataAgent-DB-Catalog",
+        "revision": "080eaeac8ac180e77c931c64e4e5e9b8ecfc0de1",
+        "path": "catalog/feature-index.sqlite.gz",
+        "sha256": "c2376d3743932d8d5b2a2c93134efd4b66aa324e653d97e1433a418db645d2a4"
+      },
+      "metadata": {
+        "schema": "sda-sample-metadata-2",
+        "tag": "metadata-v2.2-20261106",
+        "repo_id": "Biogod/SpatialDataAgent-DB-Catalog",
+        "revision": "b67c2315707e236485dbcd3b1cba493acd030df2",
+        "gated_repo_id": "Biogod/SpatialDataAgent-DB",
+        "gated_revision": "564547da4029f21f230d4d968d4b5806f6e1d3f6",
+        "path": "metadata/v2/samples_metadata_v2.csv",
+        "sha256": "6d2ef49baa470140d3ae5fcc621192d2422bfbca715de217efae29181fbc1804",
+        "files": {
+          "metadata/v2/README.md": "4697dfa2e1310f62c930f950103766bc015610b3404895a8e6676fa6f017fe02",
+          "metadata/v2/changes_v2.csv": "9f096e905effabc808c1b5ac142ff8cab3d9a367774ae82757b7406d23e631dc",
+          "metadata/v2/dropped_disease_terms.csv": "28412ef3f7f7660ea7a85ed46ebcfecec08728dadc549e03510d31a2cce11b80",
+          "metadata/v2/provenance.json": "3bcf85bc26b3777a3b82e5d911e1243437e7f5ea6c96dc943594633ef895a9ed",
+          "metadata/v2/qa_v2.json": "eed9e5ea45d33345cf16772c07e7f0adbe472b2a55d800701cdaa63402f5f4c3",
+          "metadata/v2/samples_metadata_v2.csv": "6d2ef49baa470140d3ae5fcc621192d2422bfbca715de217efae29181fbc1804",
+          "metadata/v2/samples_metadata_v2.parquet": "690bcd2be263396e2ce9522c543a7353915f583e56aef31a1ad0b1f2c78226b1",
+          "metadata/v2/schema_v2.json": "df7f767bbb2914a23d9295bdc0ba4dec4fca952465e1ec3138460728db57ecbe",
+          "metadata/v2/studies_v2.csv": "47ae0513a19ebaea9282d8362164b5b898cd143ad7132310cba4d78ee5bb8150"
+        }
+      },
+      "description": "Paper release data (same commit and files as v1.0.0-20261025) with curated sample metadata v2.2 (human-review corrections, sex_source): organ, UBERON tissue, MONDO disease, disease status, sample kind, life stage, sex, species taxonomy, assay name and type, preservation and confidence flags."
+    },
     {
       "name": "v1.1.0-20261105",
       "aliases": [
-        "metadata-v2",
-        "v1.1",
+        "metadata-v2.1",
         "v1.1.0"
       ],
       "revision": "999566bf516169ba8c9cf1ad9e5a2b722bb8a97a",
@@ -50,7 +99,7 @@
           "metadata/v2/studies_v2.csv": "d8bf238b728f901a917e5a41cadde6cb0797fd5982c369849dcc1cb2e4fb83ad"
         }
       },
-      "description": "Paper release data (same commit and files as v1.0.0-20261025) with curated sample metadata v2: organ, UBERON tissue, MONDO disease, disease status, sample kind, life stage, sex, species taxonomy, assay name and type, preservation and confidence flags."
+      "description": "Superseded by v1.1.1-20261106; kept for reproducibility of client 0.4.0. Paper release data with curated sample metadata v2.1."
     },
     {
       "name": "v1.0.0-20261025",

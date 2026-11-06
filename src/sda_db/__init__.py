@@ -18,7 +18,7 @@ from .io import coordinates, image_coordinates, load, read_sample
 from .releases import Release, known_releases, resolve_release
 from .stream import CacheLimitError, SampleStream, StreamSample, stream_samples
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 
 
 def open_catalog(release: str | None = None, **options: object) -> Catalog:

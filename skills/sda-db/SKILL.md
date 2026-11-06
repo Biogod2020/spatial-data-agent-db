@@ -6,7 +6,7 @@ description: Find, download and read public spatial transcriptomics samples (Vis
 # SpatialDataAgent-DB
 
 The atlas holds 12,163 samples from 1,265 GEO studies, and 8,211 of them have a tissue image. The default
-release `v1.1.0-20261105` is the paper data plus curated metadata v2 (organ, UBERON tissue, MONDO disease,
+release `v1.1.1-20261106` is the paper data plus curated metadata v2 (organ, UBERON tissue, MONDO disease,
 disease status, sample kind, life stage, sex, taxonomy, assay, preservation). `--release paper`
 (`v1.0.0-20261025`) is the paper release exactly as published, with its original metadata only. Use the `sda-db`
 CLI, which prints JSON when piped, or the MCP tools with the same names if they are connected. Python:
@@ -66,7 +66,7 @@ CLI, which prints JSON when piped, or the MCP tools with the same names if they 
 - **Curated metadata v2 is model-made.** In a QA set of 300 random samples, the wrong rate per field was:
   organ 0.3%, tissue term 0.7%, sample kind 0.7%, life stage 1.7% and disease 3.0%. A study-level disease
   sometimes reaches an unmarked control sample (about 1.5%). Check `disease_status_source` and the GEO text
-  when the control/disease split matters, and report `metadata-v2.1-20261105` with the selection.
+  when the control/disease split matters, and report `metadata-v2.2-20261106` with the selection.
 
 ## Access and errors
 
@@ -87,7 +87,7 @@ CLI, which prints JSON when piped, or the MCP tools with the same names if they 
   | 8 | disk full |
 
   The JSON error on stderr has `code`, `message` and `hint`.
-- **Releases.** The default `v1.1.0-20261105` has the same data commit as the frozen paper release plus
+- **Releases.** The default `v1.1.1-20261106` has the same data commit as the frozen paper release plus
   metadata v2. `--release paper` reproduces the paper exactly. `--release latest` adds reviewed daily samples
   (without metadata v2) and needs access.
 

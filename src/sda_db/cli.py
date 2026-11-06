@@ -121,7 +121,7 @@ def _note(text: str) -> None:
 def _catalog_options(parser: argparse.ArgumentParser) -> None:
     group = parser.add_argument_group("release")
     group.add_argument("--release", "--revision", dest="release", default=None, metavar="NAME",
-                       help="release name, alias, tag, 'latest' or full commit (default: v1.1.0-20261105, the "
+                       help="release name, alias, tag, 'latest' or full commit (default: v1.1.1-20261106, the "
                             "paper data with curated metadata v2; 'paper' = the paper release as published)")
     group.add_argument("--source", choices=["auto", "public", "gated"], default="auto",
                        help="where catalog files come from; auto uses the ungated mirror when the release has one")

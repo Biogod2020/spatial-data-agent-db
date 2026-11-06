@@ -1,6 +1,6 @@
 # SpatialDataAgent-DB toolkit
 
-> A Python package, CLI (`sda-db`) and MCP server for SpatialDataAgent-DB. The atlas holds 12,163 public spatial transcriptomics samples from 1,265 GEO studies in the paper release v1.0.0-20261025; the default release v1.1.0-20261105 adds curated metadata v2 (organ, UBERON tissue, MONDO disease, disease status, sample kind, life stage, sex, taxonomy, assay, preservation) to the same data. Each sample has verified AnnData expression, coordinates and sample.json metadata; 8,211 also have a registered pyramidal tissue image.
+> A Python package, CLI (`sda-db`) and MCP server for SpatialDataAgent-DB. The atlas holds 12,163 public spatial transcriptomics samples from 1,265 GEO studies in the paper release v1.0.0-20261025; the default release v1.1.1-20261106 adds curated metadata v2 (organ, UBERON tissue, MONDO disease, disease status, sample kind, life stage, sex, taxonomy, assay, preservation) to the same data. Each sample has verified AnnData expression, coordinates and sample.json metadata; 8,211 also have a registered pyramidal tissue image.
 > Searching needs no account. Downloading needs approved Hugging Face access.
 
 Key facts for agents:

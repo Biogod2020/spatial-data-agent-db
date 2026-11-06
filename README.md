@@ -122,9 +122,9 @@ import sda_db
 
 adata = sda_db.load("GSM6963121", release="starter")   # no login; expression only, saved to ./downloads
 
-catalog = sda_db.open_catalog()                  # v1.1.0-20261105: paper data + metadata v2; no login
+catalog = sda_db.open_catalog()                  # v1.1.1-20261106: paper data + metadata v2; no login
 hits = catalog.search("alzheimer hippocampus", organism="human", has_image=True)
-print(hits)                                      # <Catalog release=v1.1.0-20261105 commit=999566b samples=... >
+print(hits)                                      # <Catalog release=v1.1.1-20261106 commit=999566b samples=... >
 fibrosis = catalog.search(organ="lung", disease="fibrosis", min_confidence=0.6)   # curated fields (below)
 paper = sda_db.open_catalog("paper")             # the paper release exactly as published
 hits.to_pandas()[["gsm", "tissue", "disease", "n_obs", "score"]]
@@ -233,14 +233,15 @@ Search is deterministic. It runs offline after the first catalog download and ma
 
 ## Curated metadata v2
 
-The default release `v1.1.0-20261105` is the paper release (same commit, same files) plus a curated metadata
+The default release `v1.1.1-20261106` is the paper release (same commit, same files) plus a curated metadata
 table, [metadata v2](https://huggingface.co/datasets/Biogod/SpatialDataAgent-DB-Catalog/tree/main/metadata/v2)
-(tag `metadata-v2.1-20261105`). It is joined to every sample by GSM and adds:
+(version 2.2, tag `metadata-v2.2-20261106`, with corrections from a human review). It is joined to every sample
+by GSM and adds:
 
 - `organ` (fixed list of 43), `tissue_ontology_id`/`_name` (UBERON) and `sample_kind` (primary tissue, tumour
   tissue, metastasis, organoid, xenograft, ...);
 - `disease_status` (normal / disease / perturbation / not stated) and `disease_ontology_ids`/`_names` (MONDO);
-- `life_stage`, harmonized `sex`, `donor_key`; `organism_taxon_id`, `organism_common_name`, `organisms`;
+- `life_stage`, harmonized `sex` with its basis `sex_source`, `donor_key`; `organism_taxon_id`, `organism_common_name`, `organisms`;
 - `assay_name`, `assay_type` (imaging- or sequencing-based), `preservation` and PubMed IDs;
 - a corrected `platform` for 204 samples (the release value stays in `platform_v3`, likewise `organism_v3`,
   `sex_v3`);
@@ -271,7 +272,8 @@ metadata only, exactly as in the paper. `sda-db cite` names the metadata v2 tag 
 
 | Release | Commit | Samples | Notes |
 |---|---|---:|---|
-| `v1.1.0-20261105` (default; aliases `metadata-v2`, `v1.1`) | `999566b` | 12,163 | Paper data and files plus curated metadata v2 (tag `metadata-v2.1-20261105`) |
+| `v1.1.1-20261106` (default; aliases `metadata-v2`, `metadata-v2.2`, `v1.1`) | `999566b` | 12,163 | Paper data and files plus curated metadata v2.2 (tag `metadata-v2.2-20261106`) |
+| `v1.1.0-20261105` (aliases `metadata-v2.1`, `v1.1.0`) | `999566b` | 12,163 | Same data with metadata v2.1 (tag `metadata-v2.1-20261105`), the default of client 0.4.0; kept for reproducibility |
 | `v1.0.0-20261025` (aliases `paper`, `v1`) | `999566b` | 12,163 | Paper release as published (v3 metadata); its catalog is open and SHA256-bound, its files need access |
 | `latest` | resolved at open | grows | Rolling release with reviewed daily additions; needs access |
 

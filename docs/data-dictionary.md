@@ -67,13 +67,15 @@ Releases after the paper release add four review columns:
 
 ## Curated metadata v2 (default release)
 
-Release `v1.1.0-20261105` also joins `metadata/v2/samples_metadata_v2.csv` (tag `metadata-v2.1-20261105`,
+Release `v1.1.1-20261106` also joins `metadata/v2/samples_metadata_v2.csv` (tag `metadata-v2.2-20261106`,
 schema `sda-sample-metadata-2`, SHA256-checked) by `gsm`. Its columns are defined in
 [`schema_v2.json`](https://huggingface.co/datasets/Biogod/SpatialDataAgent-DB-Catalog/blob/main/metadata/v2/schema_v2.json)
 and listed by `sda-db fields`. Lists are `;`-joined strings, as in the CSV. Where v2 corrects or harmonizes a
 column (`platform`, `organism`, `sex`, `review_category`, `review_notes`), the v2 value takes the name and the
 earlier value is kept as `<name>_v3`. The client adds `annotation_min_confidence`, the lowest per-field confidence.
-The paper release (`--release paper`) has none of these columns.
+Version 2.2 (release `v1.1.1-20261106`) adds `sex_source` (extracted field / sample text / manual / not stated);
+`manual` in `*_source` columns marks a human-review correction. Release `v1.1.0-20261105` keeps the 2.1 table,
+which has no `sex_source`. The paper release (`--release paper`) has none of these columns.
 
 ## Atlas metadata joined by the client
 
